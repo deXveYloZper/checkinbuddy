@@ -14,7 +14,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database-setup.sql:/docker-entrypoint-initdb.d/01-init.sql
     networks:
       - checkinbuddy-network
     healthcheck:
@@ -41,21 +40,26 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.debian
     container_name: checkinbuddy-backend
     ports:
       - "3000:3000"
+    
+    # --- CHANGE 1: ADD THIS BLOCK TO READ YOUR .env FILE ---
+    env_file:
+      - .env
+
     environment:
       # Application
       APP_PORT: 3000
       NODE_ENV: development
       
       # Database
-      DATABASE_HOST: postgres
-      DATABASE_PORT: 5432
-      DATABASE_USERNAME: checkinbuddy
-      DATABASE_PASSWORD: checkinbuddy_dev_password
-      DATABASE_NAME: checkinbuddy
+      DB_HOST: postgres # or 127.0.0.1
+      DB_PORT: 5432
+      DB_USERNAME: checkinbuddy
+      DB_PASSWORD: 12345
+      DB_NAME: checkinbuddy
       
       # JWT (use strong secret in production)
       JWT_SECRET: development_jwt_secret_minimum_32_characters_long
@@ -70,10 +74,12 @@ services:
       # STRIPE_SECRET_KEY: sk_test_...
       # STRIPE_WEBHOOK_SECRET: whsec_...
       # MAPBOX_API_KEY: pk.eyJ1...
+      
     volumes:
-      # Mount Firebase service account if available
-      # - ./firebase-service-account.json:/app/firebase-service-account.json:ro
+      # --- CHANGE 2: UNCOMMENT AND CORRECT THE LINE BELOW TO MOUNT YOUR FIREBASE KEY ---
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
       - app_logs:/app/logs
+      
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,4 +98,4 @@ volumes:
 
 networks:
   checkinbuddy-network:
-    driver: bridge 
+    driver: bridge
