@@ -1,0 +1,214 @@
+### CheckInBuddy API Testing Suite
+### Use with REST Client extension in VS Code or import to Postman
+
+@baseUrl = http://localhost:3000
+@jwtToken = your_jwt_token_here
+@firebaseToken = your_firebase_token_here
+
+### Health Check
+GET {{baseUrl}}/health
+
+### =========================
+### AUTHENTICATION TESTS
+### =========================
+
+### Login with Firebase Token
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "idToken": "{{firebaseToken}}",
+  "name": "Test User",
+  "phone": "+390123456789"
+}
+
+### =========================
+### USER MANAGEMENT TESTS
+### =========================
+
+### Get User Profile
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{jwtToken}}
+
+### Update Agent Location (for agents only)
+PUT {{baseUrl}}/users/me/location
+Authorization: Bearer {{jwtToken}}
+Content-Type: application/json
+
+{
+  "latitude": 41.9028,
+  "longitude": 12.4964
+}
+
+### =========================
+### CHECK-IN REQUEST TESTS
+### =========================
+
+### Create Check-In Request (hosts only)
+POST {{baseUrl}}/check-in
+Authorization: Bearer {{jwtToken}}
+Content-Type: application/json
+
+{
+  "propertyAddress": "Via del Corso 123, Roma, RM 00186, Italy",
+  "guestName": "John Doe",
+  "guestCount": 2,
+  "checkInTime": "2024-01-15T15:00:00.000Z"
+}
+
+### Find Nearby Requests (agents only)
+GET {{baseUrl}}/check-in/nearby?lat=41.9028&lng=12.4964&radius=10
+Authorization: Bearer {{jwtToken}}
+
+### Get My Requests
+GET {{baseUrl}}/check-in/my-requests
+Authorization: Bearer {{jwtToken}}
+
+### Get Specific Request
+GET {{baseUrl}}/check-in/01234567-89ab-cdef-0123-456789abcdef
+Authorization: Bearer {{jwtToken}}
+
+### Accept Request (agents only)
+PUT {{baseUrl}}/check-in/01234567-89ab-cdef-0123-456789abcdef/accept
+Authorization: Bearer {{jwtToken}}
+
+### Update Request Status
+PUT {{baseUrl}}/check-in/01234567-89ab-cdef-0123-456789abcdef/status
+Authorization: Bearer {{jwtToken}}
+Content-Type: application/json
+
+{
+  "status": "in_progress"
+}
+
+### Complete Check-In (agents only)
+PUT {{baseUrl}}/check-in/01234567-89ab-cdef-0123-456789abcdef/complete
+Authorization: Bearer {{jwtToken}}
+
+### =========================
+### DOCUMENT MANAGEMENT TESTS
+### =========================
+
+### Generate Upload URL
+POST {{baseUrl}}/documents/upload-url
+Authorization: Bearer {{jwtToken}}
+Content-Type: application/json
+
+{
+  "checkInRequestId": "01234567-89ab-cdef-0123-456789abcdef",
+  "fileName": "passport.jpg",
+  "fileType": "image/jpeg"
+}
+
+### Generate Download URL
+GET {{baseUrl}}/documents/01234567-89ab-cdef-0123-456789abcdef/download-url
+Authorization: Bearer {{jwtToken}}
+
+### Get Documents for Check-In Request
+GET {{baseUrl}}/documents/check-in/01234567-89ab-cdef-0123-456789abcdef
+Authorization: Bearer {{jwtToken}}
+
+### Delete Document
+DELETE {{baseUrl}}/documents/01234567-89ab-cdef-0123-456789abcdef
+Authorization: Bearer {{jwtToken}}
+
+### =========================
+### PAYMENT TESTS
+### =========================
+
+### Create Payment Intent (hosts only)
+POST {{baseUrl}}/payments/create-intent
+Authorization: Bearer {{jwtToken}}
+Content-Type: application/json
+
+{
+  "checkInRequestId": "01234567-89ab-cdef-0123-456789abcdef"
+}
+
+### Get Payment Status
+GET {{baseUrl}}/payments/status/pi_1234567890
+Authorization: Bearer {{jwtToken}}
+
+### Refund Payment (hosts only)
+POST {{baseUrl}}/payments/refund/pi_1234567890
+Authorization: Bearer {{jwtToken}}
+Content-Type: application/json
+
+{
+  "reason": "Customer requested cancellation"
+}
+
+### Create Stripe Connect Account (agents only)
+POST {{baseUrl}}/payments/connect-account
+Authorization: Bearer {{jwtToken}}
+
+### Stripe Webhook (no auth required)
+POST {{baseUrl}}/payments/webhook
+Stripe-Signature: t=1234567890,v1=webhook_signature_here
+Content-Type: application/json
+
+{
+  "id": "evt_test_webhook",
+  "object": "event",
+  "type": "payment_intent.succeeded",
+  "data": {
+    "object": {
+      "id": "pi_1234567890",
+      "metadata": {
+        "checkInRequestId": "01234567-89ab-cdef-0123-456789abcdef"
+      }
+    }
+  }
+}
+
+### =========================
+### ERROR TESTING
+### =========================
+
+### Test Rate Limiting (make 101+ requests quickly)
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{jwtToken}}
+
+### Test Invalid JWT
+GET {{baseUrl}}/users/me
+Authorization: Bearer invalid_token
+
+### Test Missing Authorization
+GET {{baseUrl}}/users/me
+
+### Test Invalid Request Body
+POST {{baseUrl}}/check-in
+Authorization: Bearer {{jwtToken}}
+Content-Type: application/json
+
+{
+  "invalidField": "invalid_value"
+}
+
+### =========================
+### GEOSPATIAL TESTING
+### =========================
+
+### Test Rome Location
+GET {{baseUrl}}/check-in/nearby?lat=41.9028&lng=12.4964&radius=5
+Authorization: Bearer {{jwtToken}}
+
+### Test Milan Location
+GET {{baseUrl}}/check-in/nearby?lat=45.4642&lng=9.1900&radius=5
+Authorization: Bearer {{jwtToken}}
+
+### Test Naples Location
+GET {{baseUrl}}/check-in/nearby?lat=40.8518&lng=14.2681&radius=5
+Authorization: Bearer {{jwtToken}}
+
+### =========================
+### ADMIN/DEBUG ENDPOINTS
+### =========================
+
+### Check Database Connection (if implemented)
+GET {{baseUrl}}/health/db
+Authorization: Bearer {{jwtToken}}
+
+### Check External Services (if implemented)
+GET {{baseUrl}}/health/services
+Authorization: Bearer {{jwtToken}} 
