@@ -19,6 +19,13 @@ export enum CheckInStatus {
   EXPIRED = 'expired',
 }
 
+export enum PaymentStatus {
+  PENDING = 'pending',
+  SUCCEEDED = 'succeeded',
+  FAILED = 'failed',
+  REFUNDED = 'refunded',
+}
+
 @Entity('check_in_requests')
 export class CheckInRequest {
   @PrimaryGeneratedColumn('uuid')
@@ -89,6 +96,14 @@ export class CheckInRequest {
 
   @Column({ nullable: true, name: 'payment_intent_id' })
   paymentIntentId: string;
+
+  @Column({ 
+    type: 'enum', 
+    enum: PaymentStatus, 
+    default: PaymentStatus.PENDING,
+    name: 'payment_status'
+  })
+  paymentStatus: PaymentStatus;
 
   @Column({ type: 'text', nullable: true, name: 'cancellation_reason' })
   cancellationReason: string;

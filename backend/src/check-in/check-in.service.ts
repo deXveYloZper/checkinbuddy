@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { CheckInRequest, CheckInStatus } from './entities/check-in-request.entity';
+import { CheckInRequest, CheckInStatus, PaymentStatus } from './entities/check-in-request.entity';
 import { CreateCheckInRequestDto } from './dto/create-check-in-request.dto';
 
 @Injectable()
@@ -55,8 +55,9 @@ export class CheckInService {
          AND cr.property_location IS NOT NULL
          AND ST_DWithin(cr.property_location, ST_GeogFromText($1), $3)
          AND cr.check_in_time > NOW()
+         AND cr.payment_status = $4
        ORDER BY distance_meters ASC`,
-      [point, CheckInStatus.PENDING, radiusKm * 1000] // Convert km to meters
+      [point, CheckInStatus.PENDING, radiusKm * 1000, PaymentStatus.SUCCEEDED] // Convert km to meters
     );
   }
 
@@ -84,10 +85,26 @@ export class CheckInService {
   }
 
   async acceptRequest(requestId: string, agentId: string): Promise<CheckInRequest | null> {
-    await this.checkInRepository.update(requestId, {
-      agentId,
-      status: CheckInStatus.ACCEPTED
-    });
+    // Use atomic update with WHERE clause to prevent race condition
+    // Only update if status is still 'pending' and payment is succeeded
+    const result = await this.checkInRepository
+      .createQueryBuilder()
+      .update(CheckInRequest)
+      .set({
+        agentId,
+        status: CheckInStatus.ACCEPTED
+      })
+      .where('id = :requestId', { requestId })
+      .andWhere('status = :status', { status: CheckInStatus.PENDING })
+      .andWhere('payment_status = :paymentStatus', { paymentStatus: PaymentStatus.SUCCEEDED })
+      .execute();
+
+    // Check if the update actually modified a row
+    if (result.affected === 0) {
+      // Request was already accepted by another agent, status changed, or payment not succeeded
+      throw new Error('Request is no longer available, has already been accepted, or payment is not completed');
+    }
+
     return this.findById(requestId);
   }
 

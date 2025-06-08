@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import Stripe from 'stripe';
-import { CheckInRequest } from '../check-in/entities/check-in-request.entity';
+import { CheckInRequest, PaymentStatus } from '../check-in/entities/check-in-request.entity';
 import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
 
 @Injectable()
@@ -109,8 +109,10 @@ export class PaymentService {
 
     // Update check-in request status to indicate payment is complete
     await this.checkInRepository.update(checkInRequestId, {
-      // Payment is successful, request can now be accepted by agents
-      // Status remains 'pending' but payment is confirmed
+      paymentStatus: PaymentStatus.SUCCEEDED,
+      // Calculate and set fees
+      platformFee: Math.round(20.00 * 0.2 * 100) / 100, // 20% platform fee = €4.00
+      agentPayout: Math.round(20.00 * 0.8 * 100) / 100, // 80% to agent = €16.00
     });
 
     console.log(`Payment succeeded for check-in request: ${checkInRequestId}`);
@@ -125,8 +127,8 @@ export class PaymentService {
     }
 
     // Update check-in request to indicate payment failed
-    // Could set status to 'cancelled_host' or add a payment_failed status
     await this.checkInRepository.update(checkInRequestId, {
+      paymentStatus: PaymentStatus.FAILED,
       cancellationReason: 'Payment failed',
     });
 
@@ -156,6 +158,17 @@ export class PaymentService {
       payment_intent: paymentIntentId,
       reason: reason as Stripe.RefundCreateParams.Reason || 'requested_by_customer',
     });
+
+    // Update the check-in request payment status to refunded
+    const checkInRequest = await this.checkInRepository.findOne({
+      where: { paymentIntentId },
+    });
+
+    if (checkInRequest) {
+      await this.checkInRepository.update(checkInRequest.id, {
+        paymentStatus: PaymentStatus.REFUNDED,
+      });
+    }
 
     return {
       refundId: refund.id,
