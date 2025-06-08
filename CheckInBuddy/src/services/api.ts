@@ -131,6 +131,26 @@ class ApiService {
     }
   }
 
+  async getMyCheckInRequests(filter: 'active' | 'recent' | 'all' = 'all'): Promise<{ data: CheckInRequest[] }> {
+    try {
+      const response: AxiosResponse<CheckInRequest[]> = await this.api.get('/check-in/my-requests', {
+        params: { filter },
+      });
+      return { data: response.data };
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
+  async getHostStats(): Promise<{ data: { totalRequests: number; completedRequests: number; totalSpent: number } }> {
+    try {
+      const response = await this.api.get('/users/me/stats');
+      return { data: response.data };
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
   async getNearbyRequests(latitude: number, longitude: number, radius: number = 10): Promise<NearbyRequestsResponse> {
     try {
       const response: AxiosResponse<NearbyRequestsResponse> = await this.api.get('/check-in/nearby', {

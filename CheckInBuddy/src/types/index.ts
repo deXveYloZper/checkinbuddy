@@ -1,3 +1,8 @@
+// Navigation Imports
+import type { StackNavigationProp } from '@react-navigation/stack';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { RouteProp } from '@react-navigation/native';
+
 // User Types
 export enum UserRole {
   HOST = 'host',
@@ -129,6 +134,21 @@ export type AgentTabParamList = {
   Profile: undefined;
 };
 
+export type SharedStackParamList = {
+  RequestDetails: { requestId: string };
+  DocumentUpload: { requestId: string };
+  Payment: { requestId: string };
+  Profile: undefined;
+};
+
+// Navigation Prop Types
+export type HostTabNavigationProp = BottomTabNavigationProp<HostTabParamList>;
+export type AgentTabNavigationProp = BottomTabNavigationProp<AgentTabParamList>;
+export type SharedStackNavigationProp = StackNavigationProp<SharedStackParamList>;
+export type AppStackNavigationProp = StackNavigationProp<AppStackParamList>;
+
+export type SharedStackRouteProp<T extends keyof SharedStackParamList> = RouteProp<SharedStackParamList, T>;
+
 // Form Types
 export interface LoginForm {
   email: string;
@@ -149,6 +169,7 @@ export interface CreateRequestForm {
   guestName: string;
   guestCount: number;
   checkInTime: Date;
+  specialInstructions?: string;
 }
 
 export interface LocationUpdateForm {
@@ -248,4 +269,4 @@ export interface AgentStats {
   completedRequests: number;
   totalEarned: number;
   averageRating?: number;
-}
+} 
