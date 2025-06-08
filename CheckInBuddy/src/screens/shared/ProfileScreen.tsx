@@ -1,1 +1,11 @@
-import React from 'react'; import { Box, Center, Heading, Text } from 'native-base'; export default function PlaceholderScreen() { return (<Box flex={1} bg="gray.50"><Center flex={1}><Heading>Coming Soon</Heading><Text color="gray.600" mt={2}>This screen is under development</Text></Center></Box>); }
+import React from 'react';
+import PlaceholderScreen from '../../components/shared/PlaceholderScreen';
+
+export default function ProfileScreen() {
+  return (
+    <PlaceholderScreen 
+      title="User Profile"
+      message="Profile management coming soon"
+    />
+  );
+}
