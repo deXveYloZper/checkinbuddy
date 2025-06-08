@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -8,6 +8,7 @@ import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
 
 @Injectable()
 export class PaymentService {
+  private readonly logger = new Logger(PaymentService.name);
   private stripe: Stripe;
 
   constructor(
@@ -22,7 +23,7 @@ export class PaymentService {
         apiVersion: '2023-10-16',
       });
     } else {
-      console.warn('Stripe secret key not configured. Payment functionality will be disabled.');
+      this.logger.warn('Stripe secret key not configured. Payment functionality will be disabled.');
     }
   }
 
@@ -41,9 +42,12 @@ export class PaymentService {
       throw new Error('Check-in request not found');
     }
 
-    // Create PaymentIntent with fixed fee (€20.00 as per development plan)
+    // Get check-in fee from configuration
+    const checkInFee = this.configService.get<number>('CHECK_IN_FEE') || 20.00;
+
+    // Create PaymentIntent with configurable fee
     const paymentIntent = await this.stripe.paymentIntents.create({
-      amount: Math.round(checkInRequest.fee * 100), // Convert to cents
+      amount: Math.round(checkInFee * 100), // Convert to cents
       currency: 'eur',
       metadata: {
         checkInRequestId: createDto.checkInRequestId,
@@ -95,7 +99,7 @@ export class PaymentService {
         await this.handlePaymentFailed(event.data.object as Stripe.PaymentIntent);
         break;
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        this.logger.log(`Unhandled event type: ${event.type}`);
     }
   }
 
@@ -103,26 +107,29 @@ export class PaymentService {
     const checkInRequestId = paymentIntent.metadata.checkInRequestId;
     
     if (!checkInRequestId) {
-      console.error('No checkInRequestId in payment intent metadata');
+      this.logger.error('No checkInRequestId in payment intent metadata');
       return;
     }
+
+    // Get check-in fee from configuration for fee calculations
+    const checkInFee = this.configService.get<number>('CHECK_IN_FEE') || 20.00;
 
     // Update check-in request status to indicate payment is complete
     await this.checkInRepository.update(checkInRequestId, {
       paymentStatus: PaymentStatus.SUCCEEDED,
       // Calculate and set fees
-      platformFee: Math.round(20.00 * 0.2 * 100) / 100, // 20% platform fee = €4.00
-      agentPayout: Math.round(20.00 * 0.8 * 100) / 100, // 80% to agent = €16.00
+      platformFee: Math.round(checkInFee * 0.2 * 100) / 100, // 20% platform fee
+      agentPayout: Math.round(checkInFee * 0.8 * 100) / 100, // 80% to agent
     });
 
-    console.log(`Payment succeeded for check-in request: ${checkInRequestId}`);
+    this.logger.log(`Payment succeeded for check-in request: ${checkInRequestId}`);
   }
 
   private async handlePaymentFailed(paymentIntent: Stripe.PaymentIntent): Promise<void> {
     const checkInRequestId = paymentIntent.metadata.checkInRequestId;
     
     if (!checkInRequestId) {
-      console.error('No checkInRequestId in payment intent metadata');
+      this.logger.error('No checkInRequestId in payment intent metadata');
       return;
     }
 
@@ -132,7 +139,7 @@ export class PaymentService {
       cancellationReason: 'Payment failed',
     });
 
-    console.log(`Payment failed for check-in request: ${checkInRequestId}`);
+    this.logger.log(`Payment failed for check-in request: ${checkInRequestId}`);
   }
 
   async getPaymentStatus(paymentIntentId: string): Promise<{ status: string; amount: number; currency: string }> {

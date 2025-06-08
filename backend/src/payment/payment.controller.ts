@@ -1,10 +1,13 @@
-import { Controller, Post, Get, Body, Param, Req, Headers, RawBodyRequest, UseGuards, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Req, Headers, RawBodyRequest, UseGuards, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Request } from 'express';
 import { PaymentService } from './payment.service';
 import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('payments')
 export class PaymentController {
+  private readonly logger = new Logger(PaymentController.name);
+
   constructor(private paymentService: PaymentService) {}
 
   @Post('create-intent')
@@ -41,7 +44,7 @@ export class PaymentController {
       await this.paymentService.handleWebhook(signature, req.rawBody);
       return { received: true };
     } catch (error) {
-      console.error('Webhook error:', error.message);
+      this.logger.error(`Webhook error: ${error.message}`, error.stack);
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }

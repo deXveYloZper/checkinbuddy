@@ -73,7 +73,7 @@ export class CheckInRequest {
   })
   status: CheckInStatus;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 20.00 })
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
   fee: number;
 
   @Column({ 

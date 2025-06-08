@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -9,6 +9,7 @@ import { UploadDocumentDto } from './dto/upload-document.dto';
 
 @Injectable()
 export class DocumentService {
+  private readonly logger = new Logger(DocumentService.name);
   private s3: S3;
 
   constructor(
@@ -124,7 +125,7 @@ export class DocumentService {
   // Cron job to delete expired documents (runs hourly)
   @Cron(CronExpression.EVERY_HOUR)
   async deleteExpiredDocuments(): Promise<void> {
-    console.log('Running expired documents cleanup...');
+    this.logger.log('Running expired documents cleanup...');
 
     try {
       // Find expired documents
@@ -134,21 +135,21 @@ export class DocumentService {
         },
       });
 
-      console.log(`Found ${expiredDocuments.length} expired documents to delete`);
+      this.logger.log(`Found ${expiredDocuments.length} expired documents to delete`);
 
       // Delete each expired document
       for (const document of expiredDocuments) {
         try {
           await this.deleteDocument(document.id);
-          console.log(`Deleted expired document: ${document.id}`);
+          this.logger.debug(`Deleted expired document: ${document.id}`);
         } catch (error) {
-          console.error(`Failed to delete document ${document.id}:`, error);
+          this.logger.error(`Failed to delete document ${document.id}:`, error.stack);
         }
       }
 
-      console.log('Expired documents cleanup completed');
+      this.logger.log('Expired documents cleanup completed');
     } catch (error) {
-      console.error('Error during expired documents cleanup:', error);
+      this.logger.error('Error during expired documents cleanup:', error.stack);
     }
   }
 

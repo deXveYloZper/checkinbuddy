@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -7,6 +7,8 @@ import { CreateCheckInRequestDto } from './dto/create-check-in-request.dto';
 
 @Injectable()
 export class CheckInService {
+  private readonly logger = new Logger(CheckInService.name);
+
   constructor(
     @InjectRepository(CheckInRequest)
     private checkInRepository: Repository<CheckInRequest>,
@@ -17,12 +19,15 @@ export class CheckInService {
     hostId: string, 
     createDto: CreateCheckInRequestDto
   ): Promise<CheckInRequest> {
+    // Get check-in fee from configuration
+    const checkInFee = this.configService.get<number>('CHECK_IN_FEE') || 20.00;
+
     // Create the basic check-in request
     const checkInRequest = this.checkInRepository.create({
       hostId,
       ...createDto,
       checkInTime: new Date(createDto.checkInTime),
-      fee: 20.00, // Fixed fee as per development plan
+      fee: checkInFee,
     });
 
     const savedRequest = await this.checkInRepository.save(checkInRequest);
@@ -139,7 +144,7 @@ export class CheckInService {
         [defaultRomeLocation, requestId]
       );
     } catch (error) {
-      console.error('Geocoding failed for address:', address, error);
+      this.logger.error(`Geocoding failed for address: ${address}`, error.stack);
       // Continue without setting location - can be handled later
     }
   }
