@@ -12,12 +12,29 @@ import {
   PaymentIntent,
   UploadResponse,
   UserRole,
+  CheckInStatus,
 } from '../types';
 
 // API Configuration
 const API_BASE_URL = __DEV__ 
   ? 'http://localhost:3000' // Development
   : 'https://your-production-api.com'; // Production
+
+// Type-safe status union for updateRequestStatus
+type CheckInStatusUpdate = CheckInStatus.PENDING | CheckInStatus.ACCEPTED | CheckInStatus.IN_PROGRESS | CheckInStatus.COMPLETED | CheckInStatus.CANCELLED_HOST | CheckInStatus.CANCELLED_AGENT | CheckInStatus.EXPIRED;
+
+// Filter options for consolidated request method
+type RequestFilter = 'active' | 'recent' | 'all';
+
+// Type guard for checking if error is an axios error
+function isAxiosError(error: unknown): error is { response?: { status: number; data?: any }; message: string } {
+  return typeof error === 'object' && error !== null && 'message' in error;
+}
+
+// Type guard for checking if error has a response
+function hasErrorResponse(error: unknown): error is { response: { status: number; data?: any }; message: string } {
+  return isAxiosError(error) && error.response !== undefined;
+}
 
 class ApiService {
   private api: AxiosInstance;
@@ -50,7 +67,7 @@ class ApiService {
     this.api.interceptors.response.use(
       (response) => response,
       async (error) => {
-        if (error.response?.status === 401) {
+        if (hasErrorResponse(error) && error.response.status === 401) {
           // Token expired or invalid
           await this.logout();
         }
@@ -72,7 +89,7 @@ class ApiService {
       await AsyncStorage.setItem('user', JSON.stringify(user));
       
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
@@ -86,7 +103,7 @@ class ApiService {
     try {
       const userString = await AsyncStorage.getItem('user');
       return userString ? JSON.parse(userString) : null;
-    } catch (error) {
+    } catch (error: unknown) {
       return null;
     }
   }
@@ -97,7 +114,7 @@ class ApiService {
       const response: AxiosResponse<User> = await this.api.get('/users/me');
       await AsyncStorage.setItem('user', JSON.stringify(response.data));
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
@@ -107,46 +124,42 @@ class ApiService {
       const response: AxiosResponse<User> = await this.api.patch('/users/me/location', location);
       await AsyncStorage.setItem('user', JSON.stringify(response.data));
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
 
-  // Check-In Request Methods
+  // Check-In Request Methods - Consolidated and improved
   async createCheckInRequest(request: CreateRequestForm): Promise<CheckInRequest> {
     try {
       const response: AxiosResponse<CheckInRequest> = await this.api.post('/check-in', request);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
 
-  async getMyRequests(): Promise<CheckInRequest[]> {
-    try {
-      const response: AxiosResponse<CheckInRequest[]> = await this.api.get('/check-in/my-requests');
-      return response.data;
-    } catch (error: any) {
-      throw this.handleError(error);
-    }
-  }
-
-  async getMyCheckInRequests(filter: 'active' | 'recent' | 'all' = 'all'): Promise<{ data: CheckInRequest[] }> {
+  /**
+   * Consolidated method that replaces both getMyRequests() and getMyCheckInRequests()
+   * @param filter - Filter for request types: 'active', 'recent', or 'all'
+   * @returns Array of check-in requests
+   */
+  async getMyRequests(filter: RequestFilter = 'all'): Promise<CheckInRequest[]> {
     try {
       const response: AxiosResponse<CheckInRequest[]> = await this.api.get('/check-in/my-requests', {
         params: { filter },
       });
-      return { data: response.data };
-    } catch (error: any) {
+      return response.data;
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
 
-  async getHostStats(): Promise<{ data: { totalRequests: number; completedRequests: number; totalSpent: number } }> {
+  async getHostStats(): Promise<{ totalRequests: number; completedRequests: number; totalSpent: number }> {
     try {
       const response = await this.api.get('/users/me/stats');
-      return { data: response.data };
-    } catch (error: any) {
+      return response.data;
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
@@ -157,7 +170,7 @@ class ApiService {
         params: { latitude, longitude, radius },
       });
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
@@ -166,7 +179,7 @@ class ApiService {
     try {
       const response: AxiosResponse<CheckInRequest> = await this.api.get(`/check-in/${requestId}`);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
@@ -175,18 +188,24 @@ class ApiService {
     try {
       const response: AxiosResponse<CheckInRequest> = await this.api.patch(`/check-in/${requestId}/accept`);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
 
-  async updateRequestStatus(requestId: string, status: string): Promise<CheckInRequest> {
+  /**
+   * Update request status with type-safe status parameter
+   * @param requestId - The request ID to update
+   * @param status - Strict union type of valid CheckInStatus values
+   * @returns Updated CheckInRequest
+   */
+  async updateRequestStatus(requestId: string, status: CheckInStatusUpdate): Promise<CheckInRequest> {
     try {
       const response: AxiosResponse<CheckInRequest> = await this.api.patch(`/check-in/${requestId}/status`, {
         status,
       });
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
@@ -197,7 +216,7 @@ class ApiService {
         reason,
       });
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
@@ -211,7 +230,7 @@ class ApiService {
         fileType,
       });
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
@@ -223,7 +242,7 @@ class ApiService {
           'Content-Type': file.type,
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
@@ -232,7 +251,7 @@ class ApiService {
     try {
       const response: AxiosResponse<Document[]> = await this.api.get(`/documents/${requestId}`);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
@@ -241,7 +260,7 @@ class ApiService {
     try {
       const response = await this.api.get(`/documents/${documentId}/download-url`);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
@@ -250,10 +269,10 @@ class ApiService {
   async createPaymentIntent(requestId: string): Promise<PaymentIntent> {
     try {
       const response: AxiosResponse<PaymentIntent> = await this.api.post('/payments/create-intent', {
-        requestId,
+        checkInRequestId: requestId,
       });
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
@@ -264,24 +283,29 @@ class ApiService {
         paymentIntentId,
       });
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
 
-  // Utility Methods
-  private handleError(error: any): Error {
-    if (error.response) {
-      // Server responded with error status
-      const message = error.response.data?.message || error.response.data?.error || 'An error occurred';
-      return new Error(message);
-    } else if (error.request) {
-      // Network error
-      return new Error('Network error. Please check your connection.');
-    } else {
-      // Other error
-      return new Error(error.message || 'An unexpected error occurred');
+  // Enhanced error handling with proper type guards
+  private handleError(error: unknown): Error {
+    if (hasErrorResponse(error)) {
+      const message = error.response.data?.message || error.message || 'An error occurred';
+      const statusCode = error.response.status;
+      return new Error(`${statusCode}: ${message}`);
     }
+    
+    if (isAxiosError(error)) {
+      return new Error(error.message || 'Network error occurred');
+    }
+    
+    if (error instanceof Error) {
+      return error;
+    }
+    
+    // Fallback for unknown error types
+    return new Error('An unknown error occurred');
   }
 
   // Health check
@@ -289,12 +313,10 @@ class ApiService {
     try {
       const response = await this.api.get('/health');
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
 }
 
-// Create and export singleton instance
-const apiService = new ApiService();
-export default apiService;
+export default new ApiService();

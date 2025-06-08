@@ -43,18 +43,19 @@ export default function DashboardScreen() {
   const fetchDashboardData = async () => {
     try {
       setError(null);
-      const [activeResponse, recentResponse, statsResponse] = await Promise.all([
-        apiService.getMyCheckInRequests('active'),
-        apiService.getMyCheckInRequests('recent'),
+      const [activeRequests, recentRequests, statsResponse] = await Promise.all([
+        apiService.getMyRequests('active'),
+        apiService.getMyRequests('recent'),
         apiService.getHostStats(),
       ]);
 
-      setActiveRequests(activeResponse.data);
-      setRecentRequests(recentResponse.data);
-      setStats(statsResponse.data);
-    } catch (err: any) {
+      setActiveRequests(activeRequests);
+      setRecentRequests(recentRequests);
+      setStats(statsResponse);
+    } catch (err: unknown) {
       console.error('Dashboard fetch error:', err);
-      setError(err.response?.data?.message || 'Failed to load dashboard data');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load dashboard data';
+      setError(errorMessage);
     } finally {
       setLoading(false);
       setRefreshing(false);
