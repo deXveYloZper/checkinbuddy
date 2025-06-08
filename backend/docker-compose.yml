@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with PostGIS
+  postgres:
+    image: postgis/postgis:14-3.2
+    container_name: checkinbuddy-postgres
+    environment:
+      POSTGRES_DB: checkinbuddy
+      POSTGRES_USER: checkinbuddy
+      POSTGRES_PASSWORD: checkinbuddy_dev_password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - checkinbuddy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U checkinbuddy -d checkinbuddy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis (optional, for caching in v2)
+  redis:
+    image: redis:7-alpine
+    container_name: checkinbuddy-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - checkinbuddy-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Backend Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.debian
+    container_name: checkinbuddy-backend
+    ports:
+      - "3000:3000"
+    
+    # --- CHANGE 1: ADD THIS BLOCK TO READ YOUR .env FILE ---
+    env_file:
+      - .env
+
+    environment:
+      # Application
+      APP_PORT: 3000
+      NODE_ENV: development
+      
+      # Database
+      DB_HOST: postgres # or 127.0.0.1
+      DB_PORT: 5432
+      DB_USERNAME: checkinbuddy
+      DB_PASSWORD: 12345
+      DB_NAME: checkinbuddy
+      
+      # JWT (use strong secret in production)
+      JWT_SECRET: development_jwt_secret_minimum_32_characters_long
+      JWT_EXPIRES_IN: 24h
+      
+      # External services (configure as needed)
+      # GOOGLE_APPLICATION_CREDENTIALS: /app/firebase-service-account.json
+      # AWS_ACCESS_KEY_ID: your_aws_key
+      # AWS_SECRET_ACCESS_KEY: your_aws_secret
+      # AWS_REGION: eu-west-1
+      # AWS_S3_BUCKET_NAME: checkinbuddy-documents-dev
+      # STRIPE_SECRET_KEY: sk_test_...
+      # STRIPE_WEBHOOK_SECRET: whsec_...
+      # MAPBOX_API_KEY: pk.eyJ1...
+      
+    volumes:
+      # --- CHANGE 2: UNCOMMENT AND CORRECT THE LINE BELOW TO MOUNT YOUR FIREBASE KEY ---
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
+      - app_logs:/app/logs
+      
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - checkinbuddy-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:
+  app_logs:
+
+networks:
+  checkinbuddy-network:
+    driver: bridge

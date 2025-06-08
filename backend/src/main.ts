@@ -1,3 +1,9 @@
+// Crypto polyfill for Node.js v18 compatibility
+import { webcrypto } from 'node:crypto';
+if (!globalThis.crypto) {
+  globalThis.crypto = webcrypto as any;
+}
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
