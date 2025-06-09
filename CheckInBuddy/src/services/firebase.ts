@@ -1,7 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { 
-  initializeAuth,
-  getReactNativePersistence,
+  getAuth,
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
   signOut,
@@ -9,7 +8,6 @@ import {
   User as FirebaseUser,
   Auth
 } from 'firebase/auth';
-import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 import { UserRole } from '../types';
 
 // Firebase configuration
@@ -26,10 +24,8 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Auth with React Native persistence
-const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
-});
+// Initialize Auth - Firebase 10.3.0+ uses getAuth() which automatically handles persistence
+const auth = getAuth(app);
 
 class FirebaseService {
   private auth: Auth;

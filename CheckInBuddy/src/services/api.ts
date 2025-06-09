@@ -308,6 +308,18 @@ class ApiService {
     return new Error('An unknown error occurred');
   }
 
+  // Notification Methods
+  async registerPushToken(expoPushToken: string): Promise<{ success: boolean }> {
+    try {
+      const response = await this.api.post('/users/me/push-token', {
+        expoPushToken,
+      });
+      return response.data;
+    } catch (error: unknown) {
+      throw this.handleError(error);
+    }
+  }
+
   // Health check
   async healthCheck(): Promise<{ status: string }> {
     try {
