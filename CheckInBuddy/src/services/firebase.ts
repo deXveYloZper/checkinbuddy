@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { 
-  getAuth, 
+  initializeAuth,
+  getReactNativePersistence,
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
   signOut,
@@ -8,6 +9,7 @@ import {
   User as FirebaseUser,
   Auth
 } from 'firebase/auth';
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 import { UserRole } from '../types';
 
 // Firebase configuration
@@ -23,7 +25,11 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+
+// Initialize Auth with React Native persistence
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+});
 
 class FirebaseService {
   private auth: Auth;
@@ -51,7 +57,7 @@ class FirebaseService {
     try {
       const userCredential = await signInWithEmailAndPassword(this.auth, email, password);
       return userCredential.user;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleAuthError(error);
     }
   }
@@ -61,7 +67,7 @@ class FirebaseService {
     try {
       const userCredential = await createUserWithEmailAndPassword(this.auth, email, password);
       return userCredential.user;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleAuthError(error);
     }
   }
@@ -70,7 +76,7 @@ class FirebaseService {
   async signOut(): Promise<void> {
     try {
       await signOut(this.auth);
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleAuthError(error);
     }
   }
@@ -79,7 +85,7 @@ class FirebaseService {
   async sendPasswordReset(email: string): Promise<void> {
     try {
       await sendPasswordResetEmail(this.auth, email);
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleAuthError(error);
     }
   }
@@ -90,33 +96,40 @@ class FirebaseService {
   }
 
   // Handle Firebase auth errors
-  private handleAuthError(error: any): Error {
+  private handleAuthError(error: unknown): Error {
     let message = 'An authentication error occurred';
     
-    switch (error.code) {
-      case 'auth/user-not-found':
-        message = 'No account found with this email address';
-        break;
-      case 'auth/wrong-password':
-        message = 'Incorrect password';
-        break;
-      case 'auth/email-already-in-use':
-        message = 'An account with this email already exists';
-        break;
-      case 'auth/weak-password':
-        message = 'Password should be at least 6 characters';
-        break;
-      case 'auth/invalid-email':
-        message = 'Invalid email address';
-        break;
-      case 'auth/too-many-requests':
-        message = 'Too many failed attempts. Please try again later';
-        break;
-      case 'auth/network-request-failed':
-        message = 'Network error. Please check your connection';
-        break;
-      default:
-        message = error.message || message;
+    // Type guard for Firebase error
+    if (error && typeof error === 'object' && 'code' in error) {
+      const firebaseError = error as { code: string; message?: string };
+      
+      switch (firebaseError.code) {
+        case 'auth/user-not-found':
+          message = 'No account found with this email address';
+          break;
+        case 'auth/wrong-password':
+          message = 'Incorrect password';
+          break;
+        case 'auth/email-already-in-use':
+          message = 'An account with this email already exists';
+          break;
+        case 'auth/weak-password':
+          message = 'Password should be at least 6 characters';
+          break;
+        case 'auth/invalid-email':
+          message = 'Invalid email address';
+          break;
+        case 'auth/too-many-requests':
+          message = 'Too many failed attempts. Please try again later';
+          break;
+        case 'auth/network-request-failed':
+          message = 'Network error. Please check your connection';
+          break;
+        default:
+          message = firebaseError.message || message;
+      }
+    } else if (error instanceof Error) {
+      message = error.message;
     }
     
     return new Error(message);
