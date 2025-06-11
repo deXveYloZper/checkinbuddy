@@ -13,12 +13,16 @@ import {
   UploadResponse,
   UserRole,
   CheckInStatus,
+  VerificationStatus,
 } from '../types';
 
 // API Configuration
 const API_BASE_URL = __DEV__ 
   ? 'http://localhost:3000' // Development
   : 'https://your-production-api.com'; // Production
+
+// Demo mode - set to true to use mock data instead of real API calls
+const DEMO_MODE = false;
 
 // Type-safe status union for updateRequestStatus
 type CheckInStatusUpdate = CheckInStatus.PENDING | CheckInStatus.ACCEPTED | CheckInStatus.IN_PROGRESS | CheckInStatus.COMPLETED | CheckInStatus.CANCELLED_HOST | CheckInStatus.CANCELLED_AGENT | CheckInStatus.EXPIRED;
@@ -35,6 +39,82 @@ function isAxiosError(error: unknown): error is { response?: { status: number; d
 function hasErrorResponse(error: unknown): error is { response: { status: number; data?: any }; message: string } {
   return isAxiosError(error) && error.response !== undefined;
 }
+
+// Mock data for demo mode
+const DEMO_DATA = {
+  users: {
+    host: {
+      id: 'demo-host-1',
+      email: 'host@demo.com',
+      name: 'Demo Host',
+      phone: '+39 123 456 7890',
+      firebaseUid: 'demo-firebase-host',
+      role: UserRole.HOST,
+      location: {
+        latitude: 41.9028,
+        longitude: 12.4964,
+      },
+      verificationStatus: VerificationStatus.VERIFIED,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    } as User,
+    agent: {
+      id: 'demo-agent-1',
+      email: 'agent@demo.com',
+      name: 'Demo Agent',
+      phone: '+39 987 654 3210',
+      firebaseUid: 'demo-firebase-agent',
+      role: UserRole.AGENT,
+      location: {
+        latitude: 41.9028,
+        longitude: 12.4964,
+      },
+      verificationStatus: VerificationStatus.VERIFIED,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    } as User,
+  },
+  requests: [
+    {
+      id: 'demo-request-1',
+      hostId: 'demo-host-1',
+      agentId: undefined,
+      propertyAddress: 'Via del Corso 123, Rome, Italy',
+      propertyLocation: {
+        latitude: 41.9028,
+        longitude: 12.4964,
+      },
+      checkInTime: '15:00',
+      guestName: 'John Smith',
+      guestCount: 2,
+      status: CheckInStatus.PENDING,
+      fee: 35,
+      platformFee: 5,
+      agentPayout: 30,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: 'demo-request-2',
+      hostId: 'demo-host-1',
+      agentId: 'demo-agent-1',
+      propertyAddress: 'Piazza Navona 45, Rome, Italy',
+      propertyLocation: {
+        latitude: 41.8986,
+        longitude: 12.4735,
+      },
+      checkInTime: '16:00',
+      guestName: 'Maria Garcia',
+      guestCount: 4,
+      status: CheckInStatus.IN_PROGRESS,
+      fee: 40,
+      platformFee: 6,
+      agentPayout: 34,
+      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+  ] as CheckInRequest[],
+};
 
 class ApiService {
   private api: AxiosInstance;
@@ -76,8 +156,57 @@ class ApiService {
     );
   }
 
+  // Demo mode delay helper
+  private async delay(ms: number = 1000): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   // Auth Methods
+  async signup(firebaseToken: string, role: UserRole, name: string): Promise<LoginResponse> {
+    if (DEMO_MODE) {
+      await this.delay(1500);
+      const user = role === UserRole.HOST ? DEMO_DATA.users.host : DEMO_DATA.users.agent;
+      const demoUser = { ...user, name };
+      const token = 'demo-token-' + Date.now();
+      
+      this.authToken = token;
+      await AsyncStorage.setItem('authToken', token);
+      await AsyncStorage.setItem('user', JSON.stringify(demoUser));
+      
+      return { token, user: demoUser };
+    }
+
+    try {
+      const response: AxiosResponse<LoginResponse> = await this.api.post('/auth/signup', {
+        firebaseToken,
+        role,
+        name,
+      });
+      
+      const { token, user } = response.data;
+      this.authToken = token;
+      await AsyncStorage.setItem('authToken', token);
+      await AsyncStorage.setItem('user', JSON.stringify(user));
+      
+      return response.data;
+    } catch (error: unknown) {
+      throw this.handleError(error);
+    }
+  }
+
   async login(firebaseToken: string): Promise<LoginResponse> {
+    if (DEMO_MODE) {
+      await this.delay(1000);
+      const user = DEMO_DATA.users.host; // Default to host for demo
+      const token = 'demo-token-' + Date.now();
+      
+      this.authToken = token;
+      await AsyncStorage.setItem('authToken', token);
+      await AsyncStorage.setItem('user', JSON.stringify(user));
+      
+      return { token, user };
+    }
+
     try {
       const response: AxiosResponse<LoginResponse> = await this.api.post('/auth/login', {
         firebaseToken,
@@ -110,6 +239,15 @@ class ApiService {
 
   // User Methods
   async getProfile(): Promise<User> {
+    if (DEMO_MODE) {
+      await this.delay(500);
+      const userString = await AsyncStorage.getItem('user');
+      if (userString) {
+        return JSON.parse(userString);
+      }
+      return DEMO_DATA.users.host;
+    }
+
     try {
       const response: AxiosResponse<User> = await this.api.get('/users/me');
       await AsyncStorage.setItem('user', JSON.stringify(response.data));
@@ -120,6 +258,18 @@ class ApiService {
   }
 
   async updateLocation(location: LocationUpdateForm): Promise<User> {
+    if (DEMO_MODE) {
+      await this.delay(500);
+      const userString = await AsyncStorage.getItem('user');
+      if (userString) {
+        const user = JSON.parse(userString);
+        const updatedUser = { ...user, location };
+        await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+        return updatedUser;
+      }
+      return DEMO_DATA.users.host;
+    }
+
     try {
       const response: AxiosResponse<User> = await this.api.patch('/users/me/location', location);
       await AsyncStorage.setItem('user', JSON.stringify(response.data));
@@ -131,6 +281,31 @@ class ApiService {
 
   // Check-In Request Methods - Consolidated and improved
   async createCheckInRequest(request: CreateRequestForm): Promise<CheckInRequest> {
+    if (DEMO_MODE) {
+      await this.delay(1000);
+      const newRequest: CheckInRequest = {
+        id: 'demo-request-' + Date.now(),
+        hostId: 'demo-host-1',
+        agentId: undefined,
+        propertyAddress: request.propertyAddress,
+        propertyLocation: {
+          latitude: 41.9028,
+          longitude: 12.4964,
+        },
+        checkInTime: request.checkInTime.toTimeString().slice(0, 5),
+        guestName: request.guestName,
+        guestCount: request.guestCount,
+        status: CheckInStatus.PENDING,
+        fee: 35,
+        platformFee: 5,
+        agentPayout: 30,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      DEMO_DATA.requests.unshift(newRequest);
+      return newRequest;
+    }
+
     try {
       const response: AxiosResponse<CheckInRequest> = await this.api.post('/check-in', request);
       return response.data;
@@ -145,6 +320,11 @@ class ApiService {
    * @returns Array of check-in requests
    */
   async getMyRequests(filter: RequestFilter = 'all'): Promise<CheckInRequest[]> {
+    if (DEMO_MODE) {
+      await this.delay(500);
+      return DEMO_DATA.requests;
+    }
+
     try {
       const response: AxiosResponse<CheckInRequest[]> = await this.api.get('/check-in/my-requests', {
         params: { filter },
@@ -156,6 +336,15 @@ class ApiService {
   }
 
   async getHostStats(): Promise<{ totalRequests: number; completedRequests: number; totalSpent: number }> {
+    if (DEMO_MODE) {
+      await this.delay(500);
+      return {
+        totalRequests: 12,
+        completedRequests: 8,
+        totalSpent: 420
+      };
+    }
+
     try {
       const response = await this.api.get('/users/me/stats');
       return response.data;
@@ -165,6 +354,14 @@ class ApiService {
   }
 
   async getNearbyRequests(latitude: number, longitude: number, radius: number = 10): Promise<NearbyRequestsResponse> {
+    if (DEMO_MODE) {
+      await this.delay(800);
+      return {
+        requests: DEMO_DATA.requests.filter(r => r.status === CheckInStatus.PENDING),
+        total: 1
+      };
+    }
+
     try {
       const response: AxiosResponse<NearbyRequestsResponse> = await this.api.get('/check-in/nearby', {
         params: { latitude, longitude, radius },
@@ -176,6 +373,16 @@ class ApiService {
   }
 
   async getRequestDetails(requestId: string): Promise<CheckInRequest> {
+    if (DEMO_MODE) {
+      await this.delay(500);
+      const request = DEMO_DATA.requests.find(r => r.id === requestId);
+      if (request) {
+        return request;
+      }
+      // Return a default request if not found
+      return DEMO_DATA.requests[0];
+    }
+
     try {
       const response: AxiosResponse<CheckInRequest> = await this.api.get(`/check-in/${requestId}`);
       return response.data;
@@ -185,6 +392,21 @@ class ApiService {
   }
 
   async acceptRequest(requestId: string): Promise<CheckInRequest> {
+    if (DEMO_MODE) {
+      await this.delay(800);
+      const requestIndex = DEMO_DATA.requests.findIndex(r => r.id === requestId);
+      if (requestIndex !== -1) {
+        DEMO_DATA.requests[requestIndex] = {
+          ...DEMO_DATA.requests[requestIndex],
+          agentId: 'demo-agent-1',
+          status: CheckInStatus.ACCEPTED,
+          updatedAt: new Date().toISOString(),
+        };
+        return DEMO_DATA.requests[requestIndex];
+      }
+      return DEMO_DATA.requests[0];
+    }
+
     try {
       const response: AxiosResponse<CheckInRequest> = await this.api.patch(`/check-in/${requestId}/accept`);
       return response.data;
@@ -200,6 +422,20 @@ class ApiService {
    * @returns Updated CheckInRequest
    */
   async updateRequestStatus(requestId: string, status: CheckInStatusUpdate): Promise<CheckInRequest> {
+    if (DEMO_MODE) {
+      await this.delay(500);
+      const requestIndex = DEMO_DATA.requests.findIndex(r => r.id === requestId);
+      if (requestIndex !== -1) {
+        DEMO_DATA.requests[requestIndex] = {
+          ...DEMO_DATA.requests[requestIndex],
+          status,
+          updatedAt: new Date().toISOString(),
+        };
+        return DEMO_DATA.requests[requestIndex];
+      }
+      return DEMO_DATA.requests[0];
+    }
+
     try {
       const response: AxiosResponse<CheckInRequest> = await this.api.patch(`/check-in/${requestId}/status`, {
         status,
@@ -211,6 +447,20 @@ class ApiService {
   }
 
   async cancelRequest(requestId: string, reason?: string): Promise<CheckInRequest> {
+    if (DEMO_MODE) {
+      await this.delay(500);
+      const requestIndex = DEMO_DATA.requests.findIndex(r => r.id === requestId);
+      if (requestIndex !== -1) {
+        DEMO_DATA.requests[requestIndex] = {
+          ...DEMO_DATA.requests[requestIndex],
+          status: CheckInStatus.CANCELLED_HOST,
+          updatedAt: new Date().toISOString(),
+        };
+        return DEMO_DATA.requests[requestIndex];
+      }
+      return DEMO_DATA.requests[0];
+    }
+
     try {
       const response: AxiosResponse<CheckInRequest> = await this.api.patch(`/check-in/${requestId}/cancel`, {
         reason,
@@ -223,6 +473,14 @@ class ApiService {
 
   // Document Methods
   async getUploadUrl(requestId: string, fileName: string, fileType: string): Promise<{ uploadUrl: string; fileKey: string }> {
+    if (DEMO_MODE) {
+      await this.delay(500);
+      return {
+        uploadUrl: 'https://demo-upload-url.com',
+        fileKey: `demo-${requestId}-${fileName}`
+      };
+    }
+
     try {
       const response = await this.api.post('/documents/upload-url', {
         requestId,
@@ -236,6 +494,11 @@ class ApiService {
   }
 
   async uploadDocument(uploadUrl: string, file: any): Promise<void> {
+    if (DEMO_MODE) {
+      await this.delay(1500);
+      return;
+    }
+
     try {
       await axios.put(uploadUrl, file, {
         headers: {
@@ -248,6 +511,32 @@ class ApiService {
   }
 
   async getDocuments(requestId: string): Promise<Document[]> {
+    if (DEMO_MODE) {
+      await this.delay(500);
+      return [
+        {
+          id: 'demo-doc-1',
+          checkInRequestId: requestId,
+          uploaderId: 'demo-agent-1',
+          fileKey: 'demo-property-photos.jpg',
+          fileName: 'property_photos.jpg',
+          fileType: 'image/jpeg',
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: 'demo-doc-2',
+          checkInRequestId: requestId,
+          uploaderId: 'demo-agent-1',
+          fileKey: 'demo-guest-id.pdf',
+          fileName: 'guest_id.pdf',
+          fileType: 'application/pdf',
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: new Date().toISOString(),
+        }
+      ];
+    }
+
     try {
       const response: AxiosResponse<Document[]> = await this.api.get(`/documents/${requestId}`);
       return response.data;
@@ -257,6 +546,13 @@ class ApiService {
   }
 
   async getDocumentDownloadUrl(documentId: string): Promise<{ downloadUrl: string }> {
+    if (DEMO_MODE) {
+      await this.delay(500);
+      return {
+        downloadUrl: 'https://demo-download-url.com'
+      };
+    }
+
     try {
       const response = await this.api.get(`/documents/${documentId}/download-url`);
       return response.data;
@@ -267,9 +563,20 @@ class ApiService {
 
   // Payment Methods
   async createPaymentIntent(requestId: string): Promise<PaymentIntent> {
+    if (DEMO_MODE) {
+      await this.delay(1000);
+      return {
+        id: 'demo-payment-intent-' + Date.now(),
+        clientSecret: 'demo-client-secret',
+        amount: 3500, // €35.00 in cents
+        currency: 'eur',
+        status: 'requires_payment_method',
+      };
+    }
+
     try {
       const response: AxiosResponse<PaymentIntent> = await this.api.post('/payments/create-intent', {
-        checkInRequestId: requestId,
+        requestId,
       });
       return response.data;
     } catch (error: unknown) {
@@ -278,6 +585,11 @@ class ApiService {
   }
 
   async confirmPayment(paymentIntentId: string): Promise<{ success: boolean }> {
+    if (DEMO_MODE) {
+      await this.delay(2000);
+      return { success: true };
+    }
+
     try {
       const response = await this.api.post('/payments/confirm', {
         paymentIntentId,
@@ -288,30 +600,29 @@ class ApiService {
     }
   }
 
-  // Enhanced error handling with proper type guards
+  // Error handling
   private handleError(error: unknown): Error {
     if (hasErrorResponse(error)) {
-      const message = error.response.data?.message || error.message || 'An error occurred';
-      const statusCode = error.response.status;
-      return new Error(`${statusCode}: ${message}`);
-    }
-    
-    if (isAxiosError(error)) {
-      return new Error(error.message || 'Network error occurred');
-    }
-    
-    if (error instanceof Error) {
+      const message = error.response.data?.message || error.message;
+      return new Error(`API Error (${error.response.status}): ${message}`);
+    } else if (isAxiosError(error)) {
+      return new Error(`Network Error: ${error.message}`);
+    } else if (error instanceof Error) {
       return error;
+    } else {
+      return new Error('Unknown error occurred');
     }
-    
-    // Fallback for unknown error types
-    return new Error('An unknown error occurred');
   }
 
-  // Notification Methods
+  // Push notifications
   async registerPushToken(expoPushToken: string): Promise<{ success: boolean }> {
+    if (DEMO_MODE) {
+      await this.delay(500);
+      return { success: true };
+    }
+
     try {
-      const response = await this.api.post('/users/me/push-token', {
+      const response = await this.api.post('/notifications/register', {
         expoPushToken,
       });
       return response.data;
@@ -322,6 +633,11 @@ class ApiService {
 
   // Health check
   async healthCheck(): Promise<{ status: string }> {
+    if (DEMO_MODE) {
+      await this.delay(300);
+      return { status: 'demo_mode_active' };
+    }
+
     try {
       const response = await this.api.get('/health');
       return response.data;

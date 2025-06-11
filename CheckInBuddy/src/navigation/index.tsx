@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { Box, Center, Heading, Text as NBText, Spinner } from 'native-base';
 
 // Import Types
 import { 
@@ -42,6 +43,19 @@ const AuthStack = createStackNavigator<AuthStackParamList>();
 const AppStack = createStackNavigator<AppStackParamList>();
 const HostTab = createBottomTabNavigator<HostTabParamList>();
 const AgentTab = createBottomTabNavigator<AgentTabParamList>();
+
+// Loading Screen Component using NativeBase
+function LoadingScreen() {
+  return (
+    <Box flex={1} bg="gray.50" justifyContent="center" alignItems="center">
+      <Heading size="xl" color="primary.600" mb={4}>
+        🏠 CheckInBuddy
+      </Heading>
+      <Spinner size="lg" color="primary.500" />
+      <NBText color="gray.600" mt={4}>Loading...</NBText>
+    </Box>
+  );
+}
 
 // Auth Stack Navigator
 function AuthNavigator() {
@@ -189,27 +203,11 @@ export default function Navigation() {
 
   // Show loading screen while checking auth state
   if (isLoading || isAuthenticated === null) {
-    const LoadingScreen = () => {
-      return (
-        <View style={{ 
-          flex: 1, 
-          justifyContent: 'center', 
-          alignItems: 'center',
-          backgroundColor: '#f0f8ff' 
-        }}>
-          <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#0ea5e9', marginBottom: 20 }}>
-            🏠 CheckInBuddy
-          </Text>
-          <Text style={{ fontSize: 16, color: '#6b7280' }}>Loading...</Text>
-        </View>
-      );
-    };
-
     return (
       <NavigationContainer>
-        <AuthStack.Navigator screenOptions={{ headerShown: false }}>
-          <AuthStack.Screen name="Login" component={LoadingScreen} />
-        </AuthStack.Navigator>
+        <RootStack.Navigator screenOptions={{ headerShown: false }}>
+          <RootStack.Screen name="Loading" component={LoadingScreen} />
+        </RootStack.Navigator>
       </NavigationContainer>
     );
   }
