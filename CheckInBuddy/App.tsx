@@ -1,30 +1,43 @@
+// App.tsx
+/* -------------------------------------------------------------------------- */
+/* Root component — wraps navigation in NativeBaseProvider so useTheme works  */
+/* -------------------------------------------------------------------------- */
 import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-// Import our navigation (without theme for now)
+import { NativeBaseProvider, extendTheme } from 'native-base';
 import Navigation from './src/navigation';
 
-export default function App() {
-  useEffect(() => {
-    // TODO: Re-enable notifications after fixing the project ID issue
-    // Initialize notifications when app starts
-    const initializeNotifications = async () => {
-      try {
-        console.log('Notifications temporarily disabled for Expo Go testing');
-      } catch (error) {
-        console.error('Failed to initialize notifications:', error);
-      }
-    };
+/* Optional: customise your colour palette once, reuse everywhere */
+const theme = extendTheme({
+  colors: {
+    primary: {
+      50:  '#e3f2fd',
+      500: '#2196f3',
+      700: '#1976d2',
+    },
+  },
+});
 
-    initializeNotifications();
+export default function App() {
+  /* ------------------------------------------------------------ *
+   *  Notifications placeholder (kept from your original file)    *
+   * ------------------------------------------------------------ */
+  useEffect(() => {
+    (async () => {
+      console.log('Notifications temporarily disabled for Expo Go testing');
+    })();
   }, []);
 
+  /* ---------------------------- render ---------------------------- */
   return (
-    <SafeAreaProvider>
-      <StatusBar style="auto" />
-      <Navigation />
-    </SafeAreaProvider>
+    <NativeBaseProvider theme={theme}>    {/* <-- NEW context provider */}
+      <SafeAreaProvider>
+        <StatusBar style="auto" />
+        <Navigation />
+      </SafeAreaProvider>
+    </NativeBaseProvider>
   );
 }
