@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { User as FirebaseUser } from 'firebase/auth';
+import { Box, Center, Heading, Text as NBText, Spinner } from 'native-base';
 
-// Import types
+// Import Types
 import { 
   RootStackParamList, 
   AuthStackParamList, 
@@ -15,46 +16,51 @@ import {
   UserRole 
 } from '../types';
 
-// Import services
+// Import Services
 import firebaseService from '../services/firebase';
 import apiService from '../services/api';
 
-// Import screens (we'll create these next)
+// Import Screens
 import LoginScreen from '../screens/auth/LoginScreen';
 import SignupScreen from '../screens/auth/SignupScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 
-// Host screens
+// Host Screens
 import HostDashboardScreen from '../screens/host/DashboardScreen';
 import HostRequestsScreen from '../screens/host/RequestsScreen';
 import CreateRequestScreen from '../screens/host/CreateRequestScreen';
 
-// Agent screens
+// Agent Screens
 import AgentMapScreen from '../screens/agent/MapScreen';
 import AgentRequestsScreen from '../screens/agent/RequestsScreen';
 
-// Shared screens
+// Shared Screens
 import ProfileScreen from '../screens/shared/ProfileScreen';
-import RequestDetailsScreen from '../screens/shared/RequestDetailsScreen';
-import DocumentUploadScreen from '../screens/shared/DocumentUploadScreen';
-import PaymentScreen from '../screens/shared/PaymentScreen';
 
 // Create navigators
 const RootStack = createStackNavigator<RootStackParamList>();
 const AuthStack = createStackNavigator<AuthStackParamList>();
 const AppStack = createStackNavigator<AppStackParamList>();
-const HostTabs = createBottomTabNavigator<HostTabParamList>();
-const AgentTabs = createBottomTabNavigator<AgentTabParamList>();
+const HostTab = createBottomTabNavigator<HostTabParamList>();
+const AgentTab = createBottomTabNavigator<AgentTabParamList>();
 
-// Auth Navigator
+// Loading Screen Component using NativeBase
+function LoadingScreen() {
+  return (
+    <Box flex={1} bg="gray.50" justifyContent="center" alignItems="center">
+      <Heading size="xl" color="primary.600" mb={4}>
+        🏠 CheckInBuddy
+      </Heading>
+      <Spinner size="lg" color="primary.500" />
+      <NBText color="gray.600" mt={4}>Loading...</NBText>
+    </Box>
+  );
+}
+
+// Auth Stack Navigator
 function AuthNavigator() {
   return (
-    <AuthStack.Navigator
-      screenOptions={{
-        headerShown: false,
-        cardStyle: { backgroundColor: '#f9fafb' },
-      }}
-    >
+    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Signup" component={SignupScreen} />
       <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
@@ -65,10 +71,10 @@ function AuthNavigator() {
 // Host Tab Navigator
 function HostTabNavigator() {
   return (
-    <HostTabs.Navigator
+    <HostTab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
+          let iconName: any;
 
           if (route.name === 'Dashboard') {
             iconName = focused ? 'home' : 'home-outline';
@@ -76,50 +82,41 @@ function HostTabNavigator() {
             iconName = focused ? 'list' : 'list-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
-          } else {
-            iconName = 'help-outline';
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#0ea5e9',
-        tabBarInactiveTintColor: '#6b7280',
-        tabBarStyle: {
-          backgroundColor: 'white',
-          borderTopColor: '#e5e7eb',
-          paddingBottom: 5,
-          paddingTop: 5,
-          height: 60,
-        },
+        tabBarInactiveTintColor: 'gray',
         headerShown: false,
       })}
     >
-      <HostTabs.Screen 
+      <HostTab.Screen 
         name="Dashboard" 
-        component={HostDashboardScreen}
+        component={HostDashboardScreen} 
         options={{ tabBarLabel: 'Dashboard' }}
       />
-      <HostTabs.Screen 
+      <HostTab.Screen 
         name="Requests" 
-        component={HostRequestsScreen}
+        component={HostRequestsScreen} 
         options={{ tabBarLabel: 'My Requests' }}
       />
-      <HostTabs.Screen 
+      <HostTab.Screen 
         name="Profile" 
-        component={ProfileScreen}
+        component={ProfileScreen} 
         options={{ tabBarLabel: 'Profile' }}
       />
-    </HostTabs.Navigator>
+    </HostTab.Navigator>
   );
 }
 
 // Agent Tab Navigator
 function AgentTabNavigator() {
   return (
-    <AgentTabs.Navigator
+    <AgentTab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
+          let iconName: any;
 
           if (route.name === 'Map') {
             iconName = focused ? 'map' : 'map-outline';
@@ -127,141 +124,98 @@ function AgentTabNavigator() {
             iconName = focused ? 'briefcase' : 'briefcase-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
-          } else {
-            iconName = 'help-outline';
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#14b8a6',
-        tabBarInactiveTintColor: '#6b7280',
-        tabBarStyle: {
-          backgroundColor: 'white',
-          borderTopColor: '#e5e7eb',
-          paddingBottom: 5,
-          paddingTop: 5,
-          height: 60,
-        },
+        tabBarActiveTintColor: '#059669',
+        tabBarInactiveTintColor: 'gray',
         headerShown: false,
       })}
     >
-      <AgentTabs.Screen 
+      <AgentTab.Screen 
         name="Map" 
-        component={AgentMapScreen}
-        options={{ tabBarLabel: 'Nearby' }}
+        component={AgentMapScreen} 
+        options={{ tabBarLabel: 'Find Requests' }}
       />
-      <AgentTabs.Screen 
+      <AgentTab.Screen 
         name="MyRequests" 
-        component={AgentRequestsScreen}
-        options={{ tabBarLabel: 'My Jobs' }}
+        component={AgentRequestsScreen} 
+        options={{ tabBarLabel: 'My Requests' }}
       />
-      <AgentTabs.Screen 
+      <AgentTab.Screen 
         name="Profile" 
-        component={ProfileScreen}
+        component={ProfileScreen} 
         options={{ tabBarLabel: 'Profile' }}
       />
-    </AgentTabs.Navigator>
+    </AgentTab.Navigator>
   );
 }
 
-// App Navigator
+// App Stack Navigator
 function AppNavigator({ userRole }: { userRole: UserRole }) {
   return (
-    <AppStack.Navigator
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
+    <AppStack.Navigator screenOptions={{ headerShown: false }}>
       {userRole === UserRole.HOST ? (
-        <AppStack.Screen name="HostTabs" component={HostTabNavigator} />
+        <>
+          <AppStack.Screen name="HostTabs" component={HostTabNavigator} />
+          <AppStack.Screen name="CreateRequest" component={CreateRequestScreen} />
+        </>
       ) : (
         <AppStack.Screen name="AgentTabs" component={AgentTabNavigator} />
       )}
-      
-      {/* Shared screens */}
-      <AppStack.Screen 
-        name="CreateRequest" 
-        component={CreateRequestScreen}
-        options={{ 
-          headerShown: true,
-          title: 'Create Check-in Request',
-          headerStyle: { backgroundColor: '#0ea5e9' },
-          headerTintColor: 'white',
-        }}
-      />
-      <AppStack.Screen 
-        name="RequestDetails" 
-        component={RequestDetailsScreen}
-        options={{ 
-          headerShown: true,
-          title: 'Request Details',
-          headerStyle: { backgroundColor: '#0ea5e9' },
-          headerTintColor: 'white',
-        }}
-      />
-      <AppStack.Screen 
-        name="DocumentUpload" 
-        component={DocumentUploadScreen}
-        options={{ 
-          headerShown: true,
-          title: 'Upload Documents',
-          headerStyle: { backgroundColor: '#14b8a6' },
-          headerTintColor: 'white',
-        }}
-      />
-      <AppStack.Screen 
-        name="Payment" 
-        component={PaymentScreen}
-        options={{ 
-          headerShown: true,
-          title: 'Payment',
-          headerStyle: { backgroundColor: '#0ea5e9' },
-          headerTintColor: 'white',
-        }}
-      />
     </AppStack.Navigator>
   );
 }
 
 // Main Navigation Component
 export default function Navigation() {
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Listen to Firebase auth state changes
     const unsubscribe = firebaseService.onAuthStateChanged(async (firebaseUser) => {
-      setUser(firebaseUser);
-      
       if (firebaseUser) {
         try {
-          // Get user profile from backend to determine role
-          const userProfile = await apiService.getProfile();
-          setUserRole(userProfile.role);
+          // User is signed in, get Firebase token and login to backend
+          const firebaseToken = await firebaseUser.getIdToken();
+          const response = await apiService.login(firebaseToken);
+          
+          setIsAuthenticated(true);
+          setUserRole(response.user.role);
         } catch (error) {
-          console.error('Error fetching user profile:', error);
-          // If we can't get profile, sign out
-          await firebaseService.signOut();
+          console.error('Failed to authenticate with backend:', error);
+          setIsAuthenticated(false);
+          setUserRole(null);
         }
       } else {
+        // User is signed out
+        setIsAuthenticated(false);
         setUserRole(null);
       }
-      
       setIsLoading(false);
     });
 
     return unsubscribe;
   }, []);
 
-  if (isLoading) {
-    // TODO: Add a proper loading screen
-    return null;
+  // Show loading screen while checking auth state
+  if (isLoading || isAuthenticated === null) {
+    return (
+      <NavigationContainer>
+        <RootStack.Navigator screenOptions={{ headerShown: false }}>
+          <RootStack.Screen name="Loading" component={LoadingScreen} />
+        </RootStack.Navigator>
+      </NavigationContainer>
+    );
   }
 
   return (
     <NavigationContainer>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {user && userRole ? (
+        {isAuthenticated && userRole ? (
           <RootStack.Screen name="App">
             {() => <AppNavigator userRole={userRole} />}
           </RootStack.Screen>

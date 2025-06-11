@@ -102,6 +102,7 @@ export interface NearbyRequestsResponse {
 
 // Navigation Types
 export type RootStackParamList = {
+  Loading: undefined;
   Auth: undefined;
   App: undefined;
 };
