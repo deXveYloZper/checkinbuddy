@@ -16,10 +16,37 @@ import {
   VerificationStatus,
 } from '../types';
 
-// API Configuration
-const API_BASE_URL = __DEV__ 
-  ? 'http://localhost:3000' // Development
-  : 'https://your-production-api.com'; // Production
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+
+/* ────────────────────────────────────────────────────────────
+ *  Smart base URL – works on emulator, real device, web
+ * ──────────────────────────────────────────────────────────── */
+const getDevBaseUrl = (): string => {
+  if (!__DEV__) return 'https://your-production-api.com';          // production build
+
+  /* 1️⃣ Android emulator → special loop-back alias */
+  if (Platform.OS === 'android') return 'http://10.0.2.2:3000';
+
+  /* 2️⃣ Physical device (Expo Go / custom dev-client)
+        Try `hostUri` first (SDK 50+), then legacy `debuggerHost`. */
+  const hostUri =
+    Constants.expoConfig?.hostUri ??
+    (Constants.manifest as any)?.debuggerHost ??   // cast to any: silences TS2339
+    '';
+
+  // hostUri looks like "192.168.1.42:8081"
+  const lanIp = hostUri.split(':').shift();
+  if (lanIp) return `http://${lanIp}:3000`;
+
+  /* 3️⃣ iOS simulator & Expo web */
+  return 'http://localhost:3000';
+};
+
+const API_BASE_URL = getDevBaseUrl();
+
+
+
 
 // Demo mode - set to true to use mock data instead of real API calls
 const DEMO_MODE = false;
