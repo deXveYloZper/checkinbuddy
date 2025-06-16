@@ -33,6 +33,7 @@ export default function LoginScreen({ navigation }: Props) {
   const [errors, setErrors] = useState<Partial<LoginForm>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [touched, setTouched] = useState<Partial<LoginForm>>({});
 
   const validateForm = (): boolean => {
     const newErrors: Partial<LoginForm> = {};
@@ -54,6 +55,7 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   const handleLogin = async () => {
+    setTouched({ email: true, password: true });
     if (!validateForm()) return;
 
     setIsLoading(true);
@@ -89,6 +91,11 @@ export default function LoginScreen({ navigation }: Props) {
     navigation.navigate('Signup');
   };
 
+  const handleBlur = (field: keyof LoginForm) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    validateForm();
+  };
+
   return (
     <KeyboardAvoidingView
       flex={1}
@@ -122,12 +129,13 @@ export default function LoginScreen({ navigation }: Props) {
 
             {/* Login Form */}
             <VStack space={4} bg="white" p={6} borderRadius="xl" shadow={2}>
-              <FormControl isInvalid={'email' in errors}>
+              <FormControl isInvalid={!!(touched.email && errors.email)}>
                 <FormControl.Label>Email</FormControl.Label>
                 <Input
                   placeholder="Enter your email"
                   value={formData.email}
                   onChangeText={(text) => setFormData({ ...formData, email: text })}
+                  onBlur={() => handleBlur('email')}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -137,13 +145,14 @@ export default function LoginScreen({ navigation }: Props) {
                 </FormControl.ErrorMessage>
               </FormControl>
 
-              <FormControl isInvalid={'password' in errors}>
+              <FormControl isInvalid={!!(touched.password && errors.password)}>
                 <FormControl.Label>Password</FormControl.Label>
                 <Input
                   placeholder="Enter your password"
                   type="password"
                   value={formData.password}
                   onChangeText={(text) => setFormData({ ...formData, password: text })}
+                  onBlur={() => handleBlur('password')}
                   autoCapitalize="none"
                   autoCorrect={false}
                 />

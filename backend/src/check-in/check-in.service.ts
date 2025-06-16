@@ -175,4 +175,63 @@ export class CheckInService {
       [point, radiusKm * 1000]
     );
   }
+
+  async getAgentStats(agentId: string): Promise<{
+    totalEarnings: number;
+    completedRequests: number;
+    activeRequests: number;
+    averageRating: number;
+  }> {
+    const stats = await this.checkInRepository.query(
+      `SELECT 
+        COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN fee ELSE 0 END), 0) as total_earnings,
+        COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END) as completed_requests,
+        COUNT(CASE WHEN status IN ('ACCEPTED', 'IN_PROGRESS') THEN 1 END) as active_requests,
+        COALESCE(AVG(CASE WHEN status = 'COMPLETED' THEN rating END), 0) as average_rating
+       FROM check_in_requests
+       WHERE agent_id = $1`,
+      [agentId]
+    );
+
+    return {
+      totalEarnings: parseFloat(stats[0].total_earnings) || 0,
+      completedRequests: parseInt(stats[0].completed_requests) || 0,
+      activeRequests: parseInt(stats[0].active_requests) || 0,
+      averageRating: parseFloat(stats[0].average_rating) || 0
+    };
+  }
+
+  async getAgentRequests(
+    agentId: string,
+    status?: string,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<{
+    requests: CheckInRequest[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const queryBuilder = this.checkInRepository
+      .createQueryBuilder('request')
+      .leftJoinAndSelect('request.host', 'host')
+      .where('request.agentId = :agentId', { agentId });
+
+    if (status) {
+      queryBuilder.andWhere('request.status = :status', { status });
+    }
+
+    const [requests, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .orderBy('request.createdAt', 'DESC')
+      .getManyAndCount();
+
+    return {
+      requests,
+      total,
+      page,
+      limit
+    };
+  }
 } 

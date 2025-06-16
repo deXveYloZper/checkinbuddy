@@ -5,20 +5,20 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(private configService: ConfigService) {
+  constructor(config: ConfigService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get('JWT_SECRET') || 'checkinbuddy-dev-secret',
+      secretOrKey: config.get<string>('JWT_SECRET')!,
     });
   }
 
   async validate(payload: any) {
+    // payload.id is set in the JWT by AuthService
     return {
-      id: payload.userId,
-      firebaseUid: payload.sub,
+      id:   payload.id,          // DB user ID
       email: payload.email,
-      role: payload.role,
+      role:  payload.role,
     };
   }
-} 
+}

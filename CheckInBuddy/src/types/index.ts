@@ -91,7 +91,8 @@ export interface ApiResponse<T> {
 }
 
 export interface LoginResponse {
-  token: string;
+  accessToken: string;      // ← rename
+  refreshToken?: string;
   user: User;
 }
 

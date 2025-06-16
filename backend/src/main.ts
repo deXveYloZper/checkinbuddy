@@ -19,12 +19,17 @@ async function bootstrap() {
   }));
   
   // Enable CORS for frontend integration
+  // app.enableCors({
+  //   origin: process.env.FRONTEND_URL || '*',
+  //   credentials: true,
+  // });
   app.enableCors({
-    origin: process.env.FRONTEND_URL || '*',
+    origin: true, // or specify your Expo app's origin
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
   
-  await app.listen(process.env.PORT || 3000);
+  await app.listen(process.env.PORT || 3000, '0.0.0.0');
   console.log(`Application is running on: ${await app.getUrl()}`);
 }
 bootstrap();

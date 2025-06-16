@@ -22,6 +22,8 @@ import Constants from 'expo-constants';
 /* ────────────────────────────────────────────────────────────
  *  Smart base URL – works on emulator, real device, web
  * ──────────────────────────────────────────────────────────── */
+
+
 const getDevBaseUrl = (): string => {
   if (!__DEV__) return 'https://your-production-api.com';          // production build
 
@@ -44,6 +46,8 @@ const getDevBaseUrl = (): string => {
 };
 
 const API_BASE_URL = getDevBaseUrl();
+
+console.log('[API] Base URL →', API_BASE_URL);
 
 
 
@@ -165,6 +169,7 @@ class ApiService {
         if (this.authToken) {
           config.headers.Authorization = `Bearer ${this.authToken}`;
         }
+        console.log('[API] →', `${config.baseURL}${config.url}`);
         return config;
       },
       (error) => Promise.reject(error)
@@ -194,13 +199,13 @@ class ApiService {
       await this.delay(1500);
       const user = role === UserRole.HOST ? DEMO_DATA.users.host : DEMO_DATA.users.agent;
       const demoUser = { ...user, name };
-      const token = 'demo-token-' + Date.now();
+      const accessToken = 'demo-token-' + Date.now();
       
-      this.authToken = token;
-      await AsyncStorage.setItem('authToken', token);
+      this.authToken = accessToken;
+      await AsyncStorage.setItem('authToken', accessToken);
       await AsyncStorage.setItem('user', JSON.stringify(demoUser));
       
-      return { token, user: demoUser };
+      return { accessToken, user };
     }
 
     try {
@@ -210,9 +215,9 @@ class ApiService {
         name,
       });
       
-      const { token, user } = response.data;
-      this.authToken = token;
-      await AsyncStorage.setItem('authToken', token);
+      const { accessToken, user } = response.data;
+      this.authToken = accessToken;
+      await AsyncStorage.setItem('authToken', accessToken);
       await AsyncStorage.setItem('user', JSON.stringify(user));
       
       return response.data;
@@ -225,13 +230,13 @@ class ApiService {
     if (DEMO_MODE) {
       await this.delay(1000);
       const user = DEMO_DATA.users.host; // Default to host for demo
-      const token = 'demo-token-' + Date.now();
+      const accessToken = 'demo-token-' + Date.now();
       
-      this.authToken = token;
-      await AsyncStorage.setItem('authToken', token);
+      this.authToken = accessToken;
+      await AsyncStorage.setItem('authToken', accessToken);
       await AsyncStorage.setItem('user', JSON.stringify(user));
       
-      return { token, user };
+      return { accessToken, user };
     }
 
     try {
@@ -239,16 +244,17 @@ class ApiService {
         firebaseToken,
         role: UserRole.HOST, // Default to host role for new users
       });
+      console.log('[API] raw /auth/login response', response.data);
       
-      if (!response.data || !response.data.token || !response.data.user) {
+      if (!response.data?.accessToken || !response.data.user) {
         throw new Error('Invalid response from server');
       }
 
-      const { token, user } = response.data;
+      const { accessToken, user } = response.data;
       
       // Store token and user data
-      this.authToken = token;
-      await AsyncStorage.setItem('authToken', token);
+      this.authToken = accessToken;
+      await AsyncStorage.setItem('authToken', accessToken);;
       await AsyncStorage.setItem('user', JSON.stringify(user));
       
       return response.data;
@@ -375,18 +381,24 @@ class ApiService {
 
   async getHostStats(): Promise<{ totalRequests: number; completedRequests: number; totalSpent: number }> {
     if (DEMO_MODE) {
-      await this.delay(500);
+      await this.delay(1000);
       return {
-        totalRequests: 12,
-        completedRequests: 8,
-        totalSpent: 420
+        totalRequests: 10,
+        completedRequests: 7,
+        totalSpent: 350,
       };
     }
 
     try {
       const response = await this.api.get('/users/me/stats');
-      return response.data;
-    } catch (error: unknown) {
+      const stats = response.data;
+      return {
+        totalRequests: stats.totalRequests || 0,
+        completedRequests: stats.completedRequests || 0,
+        totalSpent: stats.totalEarnings || 0,
+      };
+    } catch (error) {
+      console.error('Error fetching stats:', error);
       throw this.handleError(error);
     }
   }
@@ -685,6 +697,29 @@ class ApiService {
     } catch (error: unknown) {
       throw this.handleError(error);
     }
+  }
+
+  // Agent Methods
+  async getAgentStats(): Promise<{ totalEarned: number; completedRequests: number; averageRating: number; activeRequests: number }> {
+    if (DEMO_MODE) {
+      return {
+        totalEarned: 340.5,
+        completedRequests: 12,
+        averageRating: 4.9,
+        activeRequests: 2,
+      };
+    }
+    const response = await this.api.get('/agents/me/stats');
+    return response.data;
+  }
+
+  async getAgentRequests(): Promise<CheckInRequest[]> {
+    if (DEMO_MODE) {
+      // Return only requests assigned to the agent
+      return DEMO_DATA.requests.filter(r => r.agentId);
+    }
+    const response = await this.api.get('/agents/me/requests');
+    return response.data;
   }
 }
 
