@@ -1,26 +1,37 @@
-import { Controller, Get, Put, Body, Req, UseGuards, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Put, Body, Req, UseGuards, HttpException, HttpStatus, Request } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UpdateLocationDto } from './dto/update-location.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CheckInService } from '../check-in/check-in.service';
+import { CheckInStatus } from '../check-in/entities/check-in-request.entity';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
 export class UserController {
-  constructor(private userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly checkInService: CheckInService,
+  ) {}
 
   @Get('me')
-  async getProfile(@Req() req: any) {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new HttpException('User not found in token', HttpStatus.UNAUTHORIZED);
-    }
+  async getProfile(@Request() req) {
+    return this.userService.findById(req.user.id);
+  }
+
+  @Get('me/stats')
+  async getStats(@Request() req) {
+    const requests = await this.checkInService.findByHostId(req.user.id);
     
-    const user = await this.userService.getProfile(userId);
-    if (!user) {
-      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
-    }
-    
-    return user;
+    const stats = {
+      totalRequests: requests.length,
+      completedRequests: requests.filter(r => r.status === CheckInStatus.COMPLETED).length,
+      cancelledRequests: requests.filter(r => r.status === CheckInStatus.CANCELLED_HOST || r.status === CheckInStatus.CANCELLED_AGENT).length,
+      totalSpent: requests
+        .filter(r => r.status === CheckInStatus.COMPLETED)
+        .reduce((sum, r) => sum + r.fee, 0),
+    };
+
+    return stats;
   }
 
   @Put('me/location')

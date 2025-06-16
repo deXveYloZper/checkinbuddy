@@ -62,6 +62,35 @@ export class CheckInController {
     }
   }
 
+  @Get('agent/stats')
+  @UseGuards(JwtAuthGuard)
+  async getAgentStats(@Req() req: any) {
+    // Verify user is an agent
+    if (req.user?.role !== 'agent') {
+      throw new HttpException('Only agents can view their stats', HttpStatus.FORBIDDEN);
+    }
+    
+    const agentId = req.user?.id;
+    return this.checkInService.getAgentStats(agentId);
+  }
+
+  @Get('agent/requests')
+  @UseGuards(JwtAuthGuard)
+  async getAgentRequests(
+    @Req() req: any,
+    @Query('status') status?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number
+  ) {
+    // Verify user is an agent
+    if (req.user?.role !== 'agent') {
+      throw new HttpException('Only agents can view their requests', HttpStatus.FORBIDDEN);
+    }
+    
+    const agentId = req.user?.id;
+    return this.checkInService.getAgentRequests(agentId, status, page, limit);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   async getRequestById(@Param('id') id: string, @Req() req: any) {

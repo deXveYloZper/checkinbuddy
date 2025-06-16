@@ -39,43 +39,35 @@ export default function SignupScreen({ navigation }: Props) {
   const [errors, setErrors] = useState<Partial<SignupForm>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [touched, setTouched] = useState<Partial<SignupForm>>({});
 
   const validateForm = (): boolean => {
     const newErrors: Partial<SignupForm> = {};
 
-    // Email validation
     if (!formData.email) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Email is invalid';
     }
 
-    // Password validation
     if (!formData.password) {
       newErrors.password = 'Password is required';
     } else if (formData.password.length < 6) {
       newErrors.password = 'Password must be at least 6 characters';
     }
 
-    // Confirm password validation
     if (!formData.confirmPassword) {
       newErrors.confirmPassword = 'Please confirm your password';
     } else if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
-    // Name validation
     if (!formData.name) {
       newErrors.name = 'Name is required';
-    } else if (formData.name.length < 2) {
-      newErrors.name = 'Name must be at least 2 characters';
     }
 
-    // Phone validation
     if (!formData.phone) {
       newErrors.phone = 'Phone number is required';
-    } else if (!/^\+?[1-9]\d{1,14}$/.test(formData.phone.replace(/\s/g, ''))) {
-      newErrors.phone = 'Please enter a valid phone number';
     }
 
     setErrors(newErrors);
@@ -83,32 +75,28 @@ export default function SignupScreen({ navigation }: Props) {
   };
 
   const handleSignup = async () => {
+    setTouched({ email: true, password: true, confirmPassword: true, name: true, phone: true });
     if (!validateForm()) return;
 
     setIsLoading(true);
     setAlertMessage(null);
 
     try {
-      // Create Firebase user
+      // Create user in Firebase
       const firebaseUser = await firebaseService.signUp(formData.email, formData.password);
+      console.log('Firebase user created:', firebaseUser);
       
       // Get Firebase ID token
       const firebaseToken = await firebaseUser.getIdToken();
+      console.log('Firebase token:', firebaseToken);
       
-      // Register with backend
-      await apiService.signup({
-        firebaseUid: firebaseUser.uid,
-        email: formData.email,
-        name: formData.name,
-        phone: formData.phone,
-        role: formData.role,
-      });
-
-      // Auto-login after successful signup
-      await apiService.login(firebaseToken);
+      // Sign up in backend
+      const response = await apiService.signup(firebaseToken, formData.role, formData.name);
+      console.log('Backend response:', response);
       
       // Navigation will be handled by the auth state change listener
     } catch (error: any) {
+      console.error('Signup error:', error);
       setAlertMessage(error.message || 'Signup failed. Please try again.');
     } finally {
       setIsLoading(false);
@@ -117,6 +105,11 @@ export default function SignupScreen({ navigation }: Props) {
 
   const handleLogin = () => {
     navigation.navigate('Login');
+  };
+
+  const handleBlur = (field: keyof SignupForm) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    validateForm();
   };
 
   return (
@@ -134,10 +127,10 @@ export default function SignupScreen({ navigation }: Props) {
             {/* Header */}
             <VStack space={2} alignItems="center">
               <Heading size="xl" color="primary.600">
-                Join CheckInBuddy
+                Create Account
               </Heading>
               <Text color="gray.600" textAlign="center">
-                Create your account to get started
+                Sign up to get started with CheckInBuddy
               </Text>
             </VStack>
 
@@ -152,47 +145,13 @@ export default function SignupScreen({ navigation }: Props) {
 
             {/* Signup Form */}
             <VStack space={4} bg="white" p={6} borderRadius="xl" shadow={2}>
-              {/* Role Selection */}
-              <FormControl>
-                <FormControl.Label>I am a:</FormControl.Label>
-                <Radio.Group
-                  name="role"
-                  value={formData.role}
-                  onChange={(value) => setFormData({ ...formData, role: value as UserRole })}
-                >
-                  <HStack space={6}>
-                    <Radio value={UserRole.HOST} colorScheme="primary">
-                      <Text ml={2}>Host</Text>
-                    </Radio>
-                    <Radio value={UserRole.AGENT} colorScheme="primary">
-                      <Text ml={2}>Agent</Text>
-                    </Radio>
-                  </HStack>
-                </Radio.Group>
-              </FormControl>
-
-              <Divider />
-
-              <FormControl isInvalid={'name' in errors}>
-                <FormControl.Label>Full Name</FormControl.Label>
-                <Input
-                  placeholder="Enter your full name"
-                  value={formData.name}
-                  onChangeText={(text) => setFormData({ ...formData, name: text })}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                />
-                <FormControl.ErrorMessage>
-                  {errors.name}
-                </FormControl.ErrorMessage>
-              </FormControl>
-
-              <FormControl isInvalid={'email' in errors}>
+              <FormControl isInvalid={!!(touched.email && errors.email)}>
                 <FormControl.Label>Email</FormControl.Label>
                 <Input
                   placeholder="Enter your email"
                   value={formData.email}
                   onChangeText={(text) => setFormData({ ...formData, email: text })}
+                  onBlur={() => handleBlur('email')}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -202,59 +161,92 @@ export default function SignupScreen({ navigation }: Props) {
                 </FormControl.ErrorMessage>
               </FormControl>
 
-              <FormControl isInvalid={'phone' in errors}>
-                <FormControl.Label>Phone Number</FormControl.Label>
+              <FormControl isInvalid={!!(touched.name && errors.name)}>
+                <FormControl.Label>Name</FormControl.Label>
+                <Input
+                  placeholder="Enter your name"
+                  value={formData.name}
+                  onChangeText={(text) => setFormData({ ...formData, name: text })}
+                  onBlur={() => handleBlur('name')}
+                  autoCapitalize="words"
+                />
+                <FormControl.ErrorMessage>
+                  {errors.name}
+                </FormControl.ErrorMessage>
+              </FormControl>
+
+              <FormControl isInvalid={!!(touched.phone && errors.phone)}>
+                <FormControl.Label>Phone</FormControl.Label>
                 <Input
                   placeholder="Enter your phone number"
                   value={formData.phone}
                   onChangeText={(text) => setFormData({ ...formData, phone: text })}
+                  onBlur={() => handleBlur('phone')}
                   keyboardType="phone-pad"
-                  autoCorrect={false}
                 />
                 <FormControl.ErrorMessage>
                   {errors.phone}
                 </FormControl.ErrorMessage>
               </FormControl>
 
-              <FormControl isInvalid={'password' in errors}>
+              <FormControl isInvalid={!!(touched.password && errors.password)}>
                 <FormControl.Label>Password</FormControl.Label>
                 <Input
                   placeholder="Create a password"
                   type="password"
                   value={formData.password}
                   onChangeText={(text) => setFormData({ ...formData, password: text })}
+                  onBlur={() => handleBlur('password')}
                   autoCapitalize="none"
-                  autoCorrect={false}
                 />
                 <FormControl.ErrorMessage>
                   {errors.password}
                 </FormControl.ErrorMessage>
               </FormControl>
 
-              <FormControl isInvalid={'confirmPassword' in errors}>
+              <FormControl isInvalid={!!(touched.confirmPassword && errors.confirmPassword)}>
                 <FormControl.Label>Confirm Password</FormControl.Label>
                 <Input
                   placeholder="Confirm your password"
                   type="password"
                   value={formData.confirmPassword}
                   onChangeText={(text) => setFormData({ ...formData, confirmPassword: text })}
+                  onBlur={() => handleBlur('confirmPassword')}
                   autoCapitalize="none"
-                  autoCorrect={false}
                 />
                 <FormControl.ErrorMessage>
                   {errors.confirmPassword}
                 </FormControl.ErrorMessage>
               </FormControl>
 
+              <FormControl>
+                <FormControl.Label>I am a:</FormControl.Label>
+                <Radio.Group
+                  name="role"
+                  value={formData.role}
+                  onChange={(value) => setFormData({ ...formData, role: value as UserRole })}
+                >
+                  <HStack space={4}>
+                    <Radio value={UserRole.HOST} colorScheme="primary">
+                      <Text ml={2}>Host</Text>
+                    </Radio>
+                    <Radio value={UserRole.AGENT} colorScheme="primary">
+                      <Text ml={2}>Agent</Text>
+                    </Radio>
+                  </HStack>
+                </Radio.Group>
+                <FormControl.HelperText>
+                  Hosts create check-in requests, Agents fulfill them
+                </FormControl.HelperText>
+              </FormControl>
+
               <Button
+                mt={4}
                 onPress={handleSignup}
                 isLoading={isLoading}
                 isLoadingText="Creating account..."
-                colorScheme="primary"
-                size="lg"
-                mt={2}
               >
-                Create Account
+                Sign Up
               </Button>
             </VStack>
 

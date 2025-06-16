@@ -1,7 +1,10 @@
-import { Controller, Post, Body, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Req, HttpCode, HttpStatus, HttpException } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RefreshTokenDto, AuthTokensDto } from './dto/auth-tokens.dto';
+import { Request } from 'express';
+import { LoginDto } from './dto/login.dto';
 import { UserService } from '../user/user.service';
-import { LoginDto, UserRole } from './dto/login.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -11,58 +14,55 @@ export class AuthController {
   ) {}
 
   @Post('login')
+  @HttpCode(HttpStatus.OK)
   async login(@Body() loginDto: LoginDto) {
     try {
-      // Verify Firebase token
       const decodedToken = await this.authService.verifyFirebaseToken(loginDto.firebaseToken);
-      
-      // Find or create user in our database
       let user = await this.userService.findByFirebaseUid(decodedToken.uid);
-      
+
       if (!user) {
-        // If role is not provided in the request, default to host
-        const role = loginDto.role || UserRole.HOST;
-        
-        // Create new user if doesn't exist
         user = await this.userService.createUser({
           firebaseUid: decodedToken.uid,
-          email: decodedToken.email || '',
-          role: role,
-          name: decodedToken.name || loginDto.name || 'User',
-          phone: loginDto.phone || '',
+          email: decodedToken.email,
+          role: loginDto.role,
+          name: loginDto.name,
+          phone: loginDto.phone,
         });
       }
-      
-      // Generate app-specific JWT for subsequent API calls
-      const { access_token, user: userData } = await this.authService.generateAppJWT(
-        decodedToken.uid,
-        decodedToken.email || '',
-        user.role,
-        user.id,
-      );
-      
+
+      const { accessToken, refreshToken } = await this.authService.generateTokens(user);
       return {
-        token: access_token,
-        user: {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          name: user.name,
-          phone: user.phone,
-          firebaseUid: user.firebaseUid,
-          verificationStatus: user.verificationStatus,
-          location: user.location,
-          stripeAccountId: user.stripeAccountId,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt,
-        },
+        message: 'Login successful',
+        accessToken,
+        refreshToken,
+        user,
       };
     } catch (error) {
-      console.error('Login error:', error);
-      throw new HttpException(
-        error.message || 'Authentication failed',
-        HttpStatus.UNAUTHORIZED,
-      );
+      throw new HttpException('Invalid Firebase token', HttpStatus.UNAUTHORIZED);
     }
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refreshToken(
+    @Body() refreshTokenDto: RefreshTokenDto,
+    @Req() req: Request,
+  ): Promise<AuthTokensDto> {
+    return this.authService.refreshAccessToken(refreshTokenDto.refreshToken);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  async logout(@Body() refreshTokenDto: RefreshTokenDto) {
+    await this.authService.revokeRefreshToken(refreshTokenDto.refreshToken);
+    return { message: 'Logged out successfully' };
+  }
+
+  @Post('logout-all')
+  @UseGuards(JwtAuthGuard)
+  async logoutAll(@Req() req: any) {
+    const userId = req.user.id;
+    await this.authService.revokeAllUserTokens(userId);
+    return { message: 'All sessions logged out successfully' };
   }
 } 

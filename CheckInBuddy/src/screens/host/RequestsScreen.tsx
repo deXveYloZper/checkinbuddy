@@ -5,8 +5,6 @@ import {
   HStack,
   Heading,
   Text,
-  FlatList,
-  Card,
   Badge,
   Icon,
   Button,
@@ -14,13 +12,13 @@ import {
   Spinner,
   Alert,
   Input,
-  Select,
   Menu,
   Pressable,
+  Card,
 } from 'native-base';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { RefreshControl } from 'react-native';
+import { RefreshControl, FlatList } from 'react-native';
 
 import apiService from '../../services/api';
 import { CheckInRequest, CheckInStatus } from '../../types';
@@ -245,81 +243,102 @@ export default function HostRequestsScreen() {
   }
 
   return (
-    <Box flex={1} bg="gray.50">
-      {/* Header */}
-      <Box bg="primary.500" pt={12} pb={4} px={4}>
-        <HStack justifyContent="space-between" alignItems="center" mb={4}>
-          <Heading color="white" size="lg">
-            My Requests
-          </Heading>
+    <Box flex={1} bg="gray.50" safeArea>
+      <VStack flex={1} space={4} p={4}>
+        {/* Header */}
+        <HStack justifyContent="space-between" alignItems="center">
+          <Heading size="lg">My Requests</Heading>
           <Button
+            leftIcon={<Icon as={MaterialIcons} name="add" size="sm" />}
             onPress={handleCreateRequest}
-            variant="outline"
-            size="sm"
-            leftIcon={<Icon as={MaterialIcons} name="add" color="white" />}
-            _text={{ color: 'white' }}
-            borderColor="white"
+            colorScheme="primary"
           >
             New Request
           </Button>
         </HStack>
 
         {/* Search and Filter */}
-        <VStack space={3}>
+        <HStack space={2}>
           <Input
-            placeholder="Search by property or guest name..."
+            flex={1}
+            placeholder="Search by address or guest name..."
             value={searchQuery}
             onChangeText={setSearchQuery}
-            bg="white"
-            borderRadius="lg"
             InputLeftElement={
-              <Icon as={MaterialIcons} name="search" size="sm" ml={3} color="gray.400" />
+              <Icon
+                as={MaterialIcons}
+                name="search"
+                size={5}
+                ml={2}
+                color="gray.400"
+              />
             }
           />
-
-          <Select
-            selectedValue={selectedStatus}
-            onValueChange={(value) => setSelectedStatus(value as CheckInStatus | 'all')}
-            bg="white"
-            borderRadius="lg"
-            placeholder="Filter by status"
+          <Menu
+            trigger={triggerProps => (
+              <Pressable {...triggerProps}>
+                <Button
+                  variant="outline"
+                  leftIcon={<Icon as={MaterialIcons} name="filter-list" size="sm" />}
+                >
+                  {selectedStatus === 'all' ? 'All' : formatStatusText(selectedStatus)}
+                </Button>
+              </Pressable>
+            )}
           >
-            <Select.Item label="All Statuses" value="all" />
-            <Select.Item label="Pending" value="pending" />
-            <Select.Item label="Accepted" value="accepted" />
-            <Select.Item label="In Progress" value="in_progress" />
-            <Select.Item label="Completed" value="completed" />
-            <Select.Item label="Cancelled" value="cancelled_host" />
-            <Select.Item label="Expired" value="expired" />
-          </Select>
-        </VStack>
-      </Box>
+            <Menu.Item onPress={() => setSelectedStatus('all')}>
+              All
+            </Menu.Item>
+            <Menu.Item onPress={() => setSelectedStatus(CheckInStatus.PENDING)}>
+              {formatStatusText(CheckInStatus.PENDING)}
+            </Menu.Item>
+            <Menu.Item onPress={() => setSelectedStatus(CheckInStatus.ACCEPTED)}>
+              {formatStatusText(CheckInStatus.ACCEPTED)}
+            </Menu.Item>
+            <Menu.Item onPress={() => setSelectedStatus(CheckInStatus.IN_PROGRESS)}>
+              {formatStatusText(CheckInStatus.IN_PROGRESS)}
+            </Menu.Item>
+            <Menu.Item onPress={() => setSelectedStatus(CheckInStatus.COMPLETED)}>
+              {formatStatusText(CheckInStatus.COMPLETED)}
+            </Menu.Item>
+            <Menu.Item onPress={() => setSelectedStatus(CheckInStatus.CANCELLED_HOST)}>
+              {formatStatusText(CheckInStatus.CANCELLED_HOST)}
+            </Menu.Item>
+            <Menu.Item onPress={() => setSelectedStatus(CheckInStatus.CANCELLED_AGENT)}>
+              {formatStatusText(CheckInStatus.CANCELLED_AGENT)}
+            </Menu.Item>
+            <Menu.Item onPress={() => setSelectedStatus(CheckInStatus.EXPIRED)}>
+              {formatStatusText(CheckInStatus.EXPIRED)}
+            </Menu.Item>
+          </Menu>
+        </HStack>
 
-      {/* Error Display */}
-      {error && (
-        <Alert status="error" mx={4} mt={4} borderRadius="lg">
-          <Alert.Icon />
-          <Text color="error.600">{error}</Text>
-        </Alert>
-      )}
+        {/* Error Alert */}
+        {error && (
+          <Alert status="error" mb={4}>
+            <Alert.Icon />
+            <Text color="error.600">{error}</Text>
+          </Alert>
+        )}
 
-      {/* Requests List */}
-      <Box flex={1}>
-        {filteredRequests.length === 0 ? (
-          renderEmptyState()
+        {/* Request List */}
+        {loading ? (
+          <Center flex={1}>
+            <Spinner size="lg" color="primary.500" />
+          </Center>
         ) : (
           <FlatList
             data={filteredRequests}
             renderItem={renderRequestItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+            keyExtractor={item => item.id}
+            contentContainerStyle={{ paddingBottom: 20 }}
+            ListEmptyComponent={renderEmptyState}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
-            showsVerticalScrollIndicator={false}
           />
         )}
-      </Box>
+      </VStack>
     </Box>
   );
 }

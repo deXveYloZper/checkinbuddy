@@ -22,12 +22,32 @@ import { Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-
+import { StackNavigationProp } from '@react-navigation/stack';
+import { AppStackParamList, CreateRequestForm } from '../../types';
 import apiService from '../../services/api';
-import { CreateRequestForm, AppStackNavigationProp } from '../../types';
 
-export default function CreateRequestScreen() {
-  const navigation = useNavigation<AppStackNavigationProp>();
+type CreateRequestScreenNavigationProp = StackNavigationProp<AppStackParamList, 'CreateRequest'>;
+
+interface Props {
+  navigation: CreateRequestScreenNavigationProp;
+}
+
+const formatDate = (date: Date): string => {
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
+const formatTime = (date: Date): string => {
+  return date.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+export default function CreateRequestScreen({ navigation }: Props) {
   const theme = useTheme();
 
   const [loading, setLoading] = useState(false);
@@ -45,33 +65,25 @@ export default function CreateRequestScreen() {
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof CreateRequestForm, string>>>({});
+  const [touched, setTouched] = useState<Partial<Record<keyof CreateRequestForm, boolean>>>({});
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof CreateRequestForm, string>> = {};
 
-    // Property Address validation
     if (!formData.propertyAddress.trim()) {
       newErrors.propertyAddress = 'Property address is required';
-    } else if (formData.propertyAddress.trim().length < 10) {
-      newErrors.propertyAddress = 'Please provide a complete address';
     }
 
-    // Guest Name validation
     if (!formData.guestName.trim()) {
       newErrors.guestName = 'Guest name is required';
-    } else if (formData.guestName.trim().length < 2) {
-      newErrors.guestName = 'Guest name must be at least 2 characters';
     }
 
-    // Guest Count validation
-    if (formData.guestCount < 1 || formData.guestCount > 20) {
-      newErrors.guestCount = 'Guest count must be between 1 and 20';
+    if (formData.guestCount < 1) {
+      newErrors.guestCount = 'Guest count must be at least 1';
     }
 
-    // Check-in Time validation
     const now = new Date();
-    const checkInTime = new Date(formData.checkInTime);
-    if (checkInTime <= now) {
+    if (formData.checkInTime <= now) {
       newErrors.checkInTime = 'Check-in time must be in the future';
     }
 
@@ -108,37 +120,33 @@ export default function CreateRequestScreen() {
     }
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
   const handleSubmit = async () => {
-    if (!validateForm()) {
-      return;
-    }
+    setTouched({
+      propertyAddress: true,
+      guestName: true,
+      guestCount: true,
+      checkInTime: true,
+    });
+    
+    if (!validateForm()) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const request = await apiService.createCheckInRequest(formData);
+      const response = await apiService.createCheckInRequest({
+        propertyAddress: formData.propertyAddress,
+        guestName: formData.guestName,
+        guestCount: formData.guestCount,
+        checkInTime: formData.checkInTime.toISOString(),
+        notes: formData.specialInstructions,
+      });
+
       setSuccess(true);
       
       // Navigate to payment screen after successful creation
       setTimeout(() => {
-        navigation.navigate('Payment', { requestId: request.id });
+        navigation.navigate('Payment', { requestId: response.id });
       }, 1500);
     } catch (err: any) {
       console.error('Create request error:', err);
@@ -205,207 +213,135 @@ export default function CreateRequestScreen() {
             </Alert>
           )}
 
-          {/* Property Address */}
-          <FormControl isRequired isInvalid={!!errors.propertyAddress}>
-            <FormControl.Label>
-              <Text fontWeight="bold" color="gray.700">
-                Property Address
-              </Text>
-            </FormControl.Label>
-            <Input
-              placeholder="Enter the complete property address where the check-in will take place..."
-              value={formData.propertyAddress}
-              onChangeText={(value) => handleInputChange('propertyAddress', value)}
-              bg="white"
-              borderColor="gray.300"
-              _focus={{ borderColor: 'primary.500', bg: 'white' }}
-              multiline
-              numberOfLines={3}
-            />
-            <FormControl.ErrorMessage>
-              {errors.propertyAddress}
-            </FormControl.ErrorMessage>
-            <FormControl.HelperText>
-              Include street address, apartment/unit number, city, and postal code
-            </FormControl.HelperText>
-          </FormControl>
+          {/* Request Form */}
+          <VStack space={4} bg="white" p={6} borderRadius="xl" shadow={2}>
+            <FormControl isInvalid={!!(touched.propertyAddress && errors.propertyAddress)}>
+              <FormControl.Label>Property Address</FormControl.Label>
+              <TextArea
+                placeholder="Enter the full property address"
+                value={formData.propertyAddress}
+                onChangeText={(text) => handleInputChange('propertyAddress', text)}
+                onBlur={() => handleBlur('propertyAddress')}
+                autoCapitalize="words"
+                h={20}
+                w="100%"
+                autoCompleteType="off"
+                isFocused={false}
+                outlineColor="gray.300"
+                outlineStyle="solid"
+                shadow={0}
+                overflow="hidden"
+              />
+              <FormControl.ErrorMessage>
+                {errors.propertyAddress}
+              </FormControl.ErrorMessage>
+            </FormControl>
 
-          {/* Guest Information */}
-          <Box bg="white" rounded="lg" p={4} shadow={1}>
-            <Heading size="sm" color="gray.700" mb={4}>
-              Guest Information
-            </Heading>
-            
-            <VStack space={4}>
-              <FormControl isRequired isInvalid={!!errors.guestName}>
-                <FormControl.Label>
-                  <Text fontWeight="medium" color="gray.600">
-                    Guest Name
-                  </Text>
-                </FormControl.Label>
-                <Input
-                  placeholder="Enter guest's full name"
-                  value={formData.guestName}
-                  onChangeText={(value) => handleInputChange('guestName', value)}
+            <FormControl isInvalid={!!(touched.guestName && errors.guestName)}>
+              <FormControl.Label>Guest Name</FormControl.Label>
+              <Input
+                placeholder="Enter guest's full name"
+                value={formData.guestName}
+                onChangeText={(text) => handleInputChange('guestName', text)}
+                onBlur={() => handleBlur('guestName')}
+                autoCapitalize="words"
+              />
+              <FormControl.ErrorMessage>
+                {errors.guestName}
+              </FormControl.ErrorMessage>
+            </FormControl>
+
+            <FormControl isInvalid={!!(touched.guestCount && errors.guestCount)}>
+              <FormControl.Label>Number of Guests</FormControl.Label>
+              <Input
+                placeholder="Enter number of guests"
+                value={formData.guestCount.toString()}
+                onChangeText={(text) => {
+                  const count = parseInt(text) || 0;
+                  handleInputChange('guestCount', count);
+                }}
+                onBlur={() => handleBlur('guestCount')}
+                keyboardType="number-pad"
+              />
+              <FormControl.ErrorMessage>
+                {errors.guestCount}
+              </FormControl.ErrorMessage>
+            </FormControl>
+
+            <FormControl isInvalid={!!(touched.checkInTime && errors.checkInTime)}>
+              <FormControl.Label>Check-in Time</FormControl.Label>
+              <HStack space={2}>
+                <Pressable
+                  flex={1}
+                  onPress={() => setShowDatePicker(true)}
                   bg="gray.50"
+                  p={4}
+                  rounded="md"
+                  borderWidth={1}
                   borderColor="gray.300"
-                  _focus={{ borderColor: 'primary.500', bg: 'white' }}
-                />
-                <FormControl.ErrorMessage>
-                  {errors.guestName}
-                </FormControl.ErrorMessage>
-              </FormControl>
-
-              <FormControl isRequired isInvalid={!!errors.guestCount}>
-                <FormControl.Label>
-                  <Text fontWeight="medium" color="gray.600">
-                    Number of Guests
-                  </Text>
-                </FormControl.Label>
-                <HStack alignItems="center" space={4}>
-                  <Pressable
-                    onPress={() => handleInputChange('guestCount', Math.max(1, formData.guestCount - 1))}
-                    bg="gray.200"
-                    rounded="full"
-                    p={2}
-                    _pressed={{ bg: 'gray.300' }}
-                  >
-                    <Icon as={MaterialIcons} name="remove" size="sm" color="gray.600" />
-                  </Pressable>
-                  
-                  <Box bg="gray.50" px={6} py={2} rounded="md" minW={16}>
-                    <Text textAlign="center" fontSize="lg" fontWeight="medium">
-                      {formData.guestCount}
+                >
+                  <HStack alignItems="center" space={2}>
+                    <Icon as={MaterialIcons} name="calendar-today" size="sm" color="gray.600" />
+                    <Text color="gray.700">
+                      {formatDate(formData.checkInTime)}
                     </Text>
-                  </Box>
-                  
-                  <Pressable
-                    onPress={() => handleInputChange('guestCount', Math.min(20, formData.guestCount + 1))}
-                    bg="gray.200"
-                    rounded="full"
-                    p={2}
-                    _pressed={{ bg: 'gray.300' }}
-                  >
-                    <Icon as={MaterialIcons} name="add" size="sm" color="gray.600" />
-                  </Pressable>
-                </HStack>
-                <FormControl.ErrorMessage>
-                  {errors.guestCount}
-                </FormControl.ErrorMessage>
-              </FormControl>
-            </VStack>
-          </Box>
-
-          {/* Check-in Date & Time */}
-          <Box bg="white" rounded="lg" p={4} shadow={1}>
-            <FormControl isRequired isInvalid={!!errors.checkInTime}>
-              <FormControl.Label>
-                <Text fontWeight="bold" color="gray.700" mb={2}>
-                  Check-in Date & Time
-                </Text>
-              </FormControl.Label>
-              
-              <VStack space={3}>
-                <HStack space={3}>
-                  <Pressable
-                    flex={1}
-                    onPress={() => setShowDatePicker(true)}
-                    bg="gray.50"
-                    p={4}
-                    rounded="md"
-                    borderWidth={1}
-                    borderColor="gray.300"
-                  >
-                    <HStack alignItems="center" space={2}>
-                      <Icon as={MaterialIcons} name="calendar-today" size="sm" color="gray.600" />
-                      <Text color="gray.700">
-                        {formatDate(formData.checkInTime)}
-                      </Text>
-                    </HStack>
-                  </Pressable>
-                  
-                  <Pressable
-                    flex={1}
-                    onPress={() => setShowTimePicker(true)}
-                    bg="gray.50"
-                    p={4}
-                    rounded="md"
-                    borderWidth={1}
-                    borderColor="gray.300"
-                  >
-                    <HStack alignItems="center" space={2}>
-                      <Icon as={MaterialIcons} name="access-time" size="sm" color="gray.600" />
-                      <Text color="gray.700">
-                        {formatTime(formData.checkInTime)}
-                      </Text>
-                    </HStack>
-                  </Pressable>
-                </HStack>
-              </VStack>
-              
+                  </HStack>
+                </Pressable>
+                
+                <Pressable
+                  flex={1}
+                  onPress={() => setShowTimePicker(true)}
+                  bg="gray.50"
+                  p={4}
+                  rounded="md"
+                  borderWidth={1}
+                  borderColor="gray.300"
+                >
+                  <HStack alignItems="center" space={2}>
+                    <Icon as={MaterialIcons} name="access-time" size="sm" color="gray.600" />
+                    <Text color="gray.700">
+                      {formatTime(formData.checkInTime)}
+                    </Text>
+                  </HStack>
+                </Pressable>
+              </HStack>
               <FormControl.ErrorMessage>
                 {errors.checkInTime}
               </FormControl.ErrorMessage>
             </FormControl>
-          </Box>
 
-          {/* Special Instructions */}
-          <FormControl>
-            <FormControl.Label>
-              <Text fontWeight="bold" color="gray.700">
-                Special Instructions (Optional)
-              </Text>
-            </FormControl.Label>
-            <Input
-              placeholder="Any special instructions for the agent (e.g., building access codes, parking information, etc.)"
-              value={formData.specialInstructions || ''}
-              onChangeText={(value) => handleInputChange('specialInstructions', value)}
-              bg="white"
-              borderColor="gray.300"
-              _focus={{ borderColor: 'primary.500', bg: 'white' }}
-              multiline
-              numberOfLines={3}
-            />
-            <FormControl.HelperText>
-              Provide any additional information that might help the agent
-            </FormControl.HelperText>
-          </FormControl>
+            <FormControl>
+              <FormControl.Label>Additional Notes</FormControl.Label>
+              <TextArea
+                placeholder="Any special instructions or notes"
+                value={formData.specialInstructions}
+                onChangeText={(text) => handleInputChange('specialInstructions', text)}
+                autoCapitalize="sentences"
+                h={20}
+                w="100%"
+                autoCompleteType="off"
+                isFocused={false}
+                outlineColor="gray.300"
+                outlineStyle="solid"
+                shadow={0}
+                overflow="hidden"
+              />
+            </FormControl>
 
-          {/* Pricing Information */}
-          <Box bg="secondary.50" rounded="lg" p={4} borderWidth={1} borderColor="secondary.200">
-            <Heading size="sm" color="secondary.700" mb={3}>
-              Pricing Information
-            </Heading>
-            <VStack space={2}>
-              <HStack justifyContent="space-between">
-                <Text color="gray.600">Service Fee:</Text>
-                <Text fontWeight="medium" color="gray.800">€20.00</Text>
-              </HStack>
-              <HStack justifyContent="space-between">
-                <Text color="gray.600">Platform Fee:</Text>
-                <Text fontWeight="medium" color="gray.800">€4.00</Text>
-              </HStack>
-              <Box h={0.5} bg="gray.300" my={1} />
-              <HStack justifyContent="space-between">
-                <Text fontWeight="bold" color="gray.800">Total:</Text>
-                <Text fontWeight="bold" color="secondary.600" fontSize="lg">€24.00</Text>
-              </HStack>
-            </VStack>
-          </Box>
-
-          {/* Submit Button */}
-          <Button
-            onPress={handleSubmit}
-            isLoading={loading}
-            isDisabled={loading}
-            bg="primary.500"
-            _pressed={{ bg: 'primary.600' }}
-            _text={{ fontWeight: 'bold' }}
-            size="lg"
-            leftIcon={<Icon as={MaterialIcons} name="payment" size="sm" color="white" />}
-          >
-            {loading ? 'Creating Request...' : 'Create Request & Pay'}
-          </Button>
+            <Button
+              mt={4}
+              onPress={handleSubmit}
+              isLoading={loading}
+              isDisabled={loading}
+              bg="primary.500"
+              _pressed={{ bg: 'primary.600' }}
+              _text={{ fontWeight: 'bold' }}
+              size="lg"
+              leftIcon={<Icon as={MaterialIcons} name="payment" size="sm" color="white" />}
+            >
+              {loading ? 'Creating Request...' : 'Create Request & Pay'}
+            </Button>
+          </VStack>
         </VStack>
       </ScrollView>
 
