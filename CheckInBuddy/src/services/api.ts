@@ -237,15 +237,26 @@ class ApiService {
     try {
       const response: AxiosResponse<LoginResponse> = await this.api.post('/auth/login', {
         firebaseToken,
+        role: UserRole.HOST, // Default to host role for new users
       });
       
+      if (!response.data || !response.data.token || !response.data.user) {
+        throw new Error('Invalid response from server');
+      }
+
       const { token, user } = response.data;
+      
+      // Store token and user data
       this.authToken = token;
       await AsyncStorage.setItem('authToken', token);
       await AsyncStorage.setItem('user', JSON.stringify(user));
       
       return response.data;
     } catch (error: unknown) {
+      // Clear any existing auth data on error
+      this.authToken = null;
+      await AsyncStorage.removeItem('authToken');
+      await AsyncStorage.removeItem('user');
       throw this.handleError(error);
     }
   }
@@ -630,15 +641,18 @@ class ApiService {
   // Error handling
   private handleError(error: unknown): Error {
     if (hasErrorResponse(error)) {
-      const message = error.response.data?.message || error.message;
+      // Server responded with an error
+      const message = error.response.data?.message || error.response.data?.error || 'Server error';
       return new Error(`API Error (${error.response.status}): ${message}`);
     } else if (isAxiosError(error)) {
-      return new Error(`Network Error: ${error.message}`);
-    } else if (error instanceof Error) {
-      return error;
-    } else {
-      return new Error('Unknown error occurred');
+      // Network error or other Axios error
+      if (error.message === 'Network Error') {
+        return new Error('Network error. Please check your connection and try again.');
+      }
+      return new Error(error.message || 'API request failed');
     }
+    // Unknown error
+    return new Error((error as Error)?.message || 'An unexpected error occurred');
   }
 
   // Push notifications

@@ -62,15 +62,19 @@ export default function LoginScreen({ navigation }: Props) {
     try {
       // Sign in with Firebase
       const firebaseUser = await firebaseService.signIn(formData.email, formData.password);
+      console.log('Firebase user:', firebaseUser);
       
       // Get Firebase ID token
       const firebaseToken = await firebaseUser.getIdToken();
+      console.log('Firebase token:', firebaseToken);
       
       // Login to backend and get app token
-      await apiService.login(firebaseToken);
+      const response = await apiService.login(firebaseToken);
+      console.log('Backend response:', response);
       
       // Navigation will be handled by the auth state change listener
     } catch (error: any) {
+      console.error('Login error:', error);
       setAlertMessage(error.message || 'Login failed. Please try again.');
     } finally {
       setIsLoading(false);

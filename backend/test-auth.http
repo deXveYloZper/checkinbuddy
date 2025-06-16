@@ -1,0 +1,37 @@
+### Test Authentication Flow
+
+### 1. Login as Host
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "firebaseToken": "{{firebaseToken}}",
+  "role": "host",
+  "name": "Test Host",
+  "phone": "+1234567890"
+}
+
+### 2. Login as Agent
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "firebaseToken": "{{firebaseToken}}",
+  "role": "agent",
+  "name": "Test Agent",
+  "phone": "+1234567890"
+}
+
+### 3. Get User Profile (requires JWT token)
+GET http://localhost:3000/users/me
+Authorization: Bearer {{jwtToken}}
+
+### 4. Update Agent Location (requires JWT token)
+POST http://localhost:3000/users/me/location
+Authorization: Bearer {{jwtToken}}
+Content-Type: application/json
+
+{
+  "latitude": 45.4642,
+  "longitude": 9.1900
+} 
