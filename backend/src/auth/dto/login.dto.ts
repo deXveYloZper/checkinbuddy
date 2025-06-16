@@ -10,9 +10,9 @@ export class LoginDto {
   @IsString()
   firebaseToken: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsEnum(UserRole)
-  role: UserRole;
+  role?: UserRole;
 
   @IsOptional()
   @IsString()
